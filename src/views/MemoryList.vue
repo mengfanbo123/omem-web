@@ -1,240 +1,398 @@
 <template>
-  <div class="memory-list-container">
-    <div class="header">
-      <h1 class="page-title">记忆库</h1>
-      <p class="page-subtitle">管理和浏览你的记忆</p>
-    </div>
-
-    <div class="filters-section">
-      <a-row :gutter="16">
-        <a-col :span="6">
+  <div class="memory-list">
+    <a-card :bordered="false">
+      <a-form layout="inline" style="margin-bottom: 16px">
+        <a-form-item label="分类">
           <a-select
             v-model:value="filters.category"
-            placeholder="分类"
+            :options="CATEGORY_OPTIONS"
+            placeholder="全部"
             allow-clear
-            style="width: 100%"
-            @change="handleFilterChange"
-          >
-            <a-select-option value="profile">Profile</a-select-option>
-            <a-select-option value="preferences">Preferences</a-select-option>
-            <a-select-option value="entities">Entities</a-select-option>
-            <a-select-option value="events">Events</a-select-option>
-            <a-select-option value="cases">Cases</a-select-option>
-            <a-select-option value="patterns">Patterns</a-select-option>
-          </a-select>
-        </a-col>
-        <a-col :span="4">
+            style="width: 120px"
+          />
+        </a-form-item>
+        <a-form-item label="层级">
           <a-select
             v-model:value="filters.tier"
-            placeholder="层级"
+            :options="TIER_OPTIONS"
+            placeholder="全部"
             allow-clear
-            style="width: 100%"
-            @change="handleFilterChange"
-          >
-            <a-select-option value="core">Core</a-select-option>
-            <a-select-option value="working">Working</a-select-option>
-            <a-select-option value="peripheral">Peripheral</a-select-option>
-          </a-select>
-        </a-col>
-        <a-col :span="4">
+            style="width: 100px"
+          />
+        </a-form-item>
+        <a-form-item label="类型">
           <a-select
             v-model:value="filters.memory_type"
-            placeholder="类型"
+            :options="MEMORY_TYPE_OPTIONS"
+            placeholder="全部"
             allow-clear
-            style="width: 100%"
-            @change="handleFilterChange"
-          >
-            <a-select-option value="pinned">Pinned</a-select-option>
-            <a-select-option value="insight">Insight</a-select-option>
-            <a-select-option value="session">Session</a-select-option>
-          </a-select>
-        </a-col>
-        <a-col :span="4">
+            style="width: 100px"
+          />
+        </a-form-item>
+        <a-form-item label="状态">
           <a-select
             v-model:value="filters.state"
-            placeholder="状态"
+            :options="STATE_OPTIONS"
+            placeholder="全部"
             allow-clear
-            style="width: 100%"
-            @change="handleFilterChange"
-          >
-            <a-select-option value="active">Active</a-select-option>
-            <a-select-option value="archived">Archived</a-select-option>
-            <a-select-option value="deleted">Deleted</a-select-option>
-          </a-select>
-        </a-col>
-        <a-col :span="6">
+            style="width: 100px"
+          />
+        </a-form-item>
+        <a-form-item label="标签">
           <a-input
             v-model:value="filters.tags"
-            placeholder="标签 (逗号分隔)"
+            placeholder="输入标签"
             allow-clear
-            @pressEnter="handleFilterChange"
+            style="width: 150px"
           />
-        </a-col>
-      </a-row>
-    </div>
+        </a-form-item>
+        <a-form-item>
+          <a-button type="primary" @click="fetchMemories">查询</a-button>
+          <a-button style="margin-left: 8px" @click="resetFilters">重置</a-button>
+          <a-button type="primary" style="margin-left: 8px" @click="openModal()">新增记忆</a-button>
+        </a-form-item>
+      </a-form>
 
-    <div v-if="loading" class="loading-state">
-      <a-spin size="large" />
-    </div>
+      <a-table
+        :columns="columns"
+        :data-source="memories"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="(record) => record.id"
+        bordered
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.dataIndex === 'category'">
+            <a-tag :color="getCategoryColor(record.category)">
+              {{ CATEGORY_LABELS[record.category] }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'tier'">
+            <a-tag :color="getTierColor(record.tier)">
+              {{ TIER_LABELS[record.tier] }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'memory_type'">
+            <a-tag>{{ MEMORY_TYPE_LABELS[record.memory_type] }}</a-tag>
+          </template>
+          <template v-else-if="column.dataIndex === 'content'">
+            <div class="content-cell">{{ record.content }}</div>
+          </template>
+          <template v-else-if="column.dataIndex === 'tags'">
+            <a-tag v-for="tag in record.tags?.slice(0, 3)" :key="tag" color="blue">
+              {{ tag }}
+            </a-tag>
+            <span v-if="record.tags && record.tags.length > 3">...</span>
+          </template>
+          <template v-else-if="column.dataIndex === 'action'">
+            <a-space>
+              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-popconfirm
+                title="确定要删除这条记忆吗？"
+                ok-text="确定"
+                cancel-text="取消"
+                @confirm="handleDelete(record.id)"
+              >
+                <a-button type="link" size="small" danger>删除</a-button>
+              </a-popconfirm>
+              <a-button type="link" size="small" @click="viewDetail(record.id)">详情</a-button>
+            </a-space>
+          </template>
+        </template>
+      </a-table>
+    </a-card>
 
-    <div v-else-if="error" class="error-state">
-      <a-alert type="error" :message="error" show-icon />
-    </div>
-
-    <div v-else>
-      <a-row :gutter="[16, 16]" class="memory-grid">
-        <a-col
-          v-for="memory in memories"
-          :key="memory.id"
-          :xs="24"
-          :sm="12"
-          :lg="8"
-          :xl="6"
-        >
-          <a-card
-            class="memory-card"
-            hoverable
-            @click="goToDetail(memory.id)"
-          >
-            <div class="card-header">
-              <a-tag :color="getCategoryColor(memory.category)" class="category-tag">
-                {{ memory.category }}
-              </a-tag>
-              <a-tag :color="getTierColor(memory.tier)" class="tier-tag">
-                {{ memory.tier }}
-              </a-tag>
-            </div>
-            <p class="memory-content">{{ truncateContent(memory.content) }}</p>
-            <div class="card-footer">
-              <span class="memory-date">{{ formatDate(memory.created_at) }}</span>
-              <span v-if="memory.tags.length" class="memory-tags-count">
-                {{ memory.tags.length }} tags
-              </span>
-            </div>
-          </a-card>
-        </a-col>
-      </a-row>
-
-      <div v-if="memories.length === 0" class="empty-state">
-        <a-empty description="暂无记忆" />
-      </div>
-
-      <div class="pagination-section">
-        <a-pagination
-          v-model:current="pagination.offset"
-          :page-size="pagination.limit"
-          :total="totalCount"
-          :show-size-changer="true"
-          :page-size-options="['12', '24', '48', '96']"
-          :show-total="(total: number) => `共 ${total} 条`"
-          @change="handlePageChange"
-          @showSizeChange="handleSizeChange"
-        />
-      </div>
-    </div>
+    <a-modal
+      v-model:open="modalVisible"
+      :title="modalTitle"
+      :confirm-loading="modalLoading"
+      width="800px"
+      destroy-on-close
+      @ok="handleModalOk"
+    >
+      <a-form
+        ref="formRef"
+        :model="formState"
+        :rules="formRules"
+        layout="vertical"
+      >
+        <a-form-item label="内容" name="content">
+          <a-textarea
+            v-model:value="formState.content"
+            placeholder="请输入记忆内容"
+            :rows="6"
+          />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item label="分类" name="category">
+              <a-select
+                v-model:value="formState.category"
+                :options="CATEGORY_OPTIONS"
+                placeholder="请选择分类"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="层级" name="tier">
+              <a-select
+                v-model:value="formState.tier"
+                :options="TIER_OPTIONS"
+                placeholder="请选择层级"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="类型" name="memory_type">
+              <a-select
+                v-model:value="formState.memory_type"
+                :options="MEMORY_TYPE_OPTIONS"
+                placeholder="请选择类型"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="标签" name="tags">
+          <a-select
+            v-model:value="formState.tags"
+            mode="tags"
+            placeholder="输入标签后按回车"
+            :token-separators="[',']"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
+import type { TableProps, FormInstance } from 'ant-design-vue'
 import { memoriesApi } from '@/api/memories'
-import type { Memory } from '@/types/memory'
-import type { MemoryListParams } from '@/api/types'
+import type { Memory, Category, Tier, MemoryType } from '@/types/memory'
+import {
+  CATEGORY_OPTIONS,
+  TIER_OPTIONS,
+  MEMORY_TYPE_OPTIONS,
+  STATE_OPTIONS,
+  CATEGORY_LABELS,
+  TIER_LABELS,
+  MEMORY_TYPE_LABELS
+} from '@/utils/enums'
 
 const router = useRouter()
-
 const loading = ref(false)
-const error = ref('')
 const memories = ref<Memory[]>([])
-const totalCount = ref(0)
+const formRef = ref<FormInstance>()
 
-const filters = reactive<MemoryListParams>({
-  category: undefined,
-  tier: undefined,
-  memory_type: undefined,
+const filters = reactive({
+  category: undefined as Category | undefined,
+  tier: undefined as Tier | undefined,
+  memory_type: undefined as MemoryType | undefined,
   state: undefined,
-  tags: undefined,
+  tags: ''
 })
 
 const pagination = reactive({
-  limit: 12,
-  offset: 1,
+  current: 1,
+  pageSize: 12,
+  total: 0,
+  showSizeChanger: true,
+  pageSizeOptions: ['12', '24', '48', '96']
 })
 
-const getCategoryColor = (category: string): string => {
-  const colors: Record<string, string> = {
-    profile: 'blue',
-    preferences: 'green',
-    entities: 'purple',
-    events: 'orange',
-    cases: 'red',
-    patterns: 'cyan',
+const columns = [
+  {
+    title: '分类',
+    dataIndex: 'category',
+    width: 100,
+    align: 'center' as const
+  },
+  {
+    title: '层级',
+    dataIndex: 'tier',
+    width: 80,
+    align: 'center' as const
+  },
+  {
+    title: '类型',
+    dataIndex: 'memory_type',
+    width: 80,
+    align: 'center' as const
+  },
+  {
+    title: '内容',
+    dataIndex: 'content',
+    ellipsis: true
+  },
+  {
+    title: '标签',
+    dataIndex: 'tags',
+    width: 200
+  },
+  {
+    title: '创建时间',
+    dataIndex: 'created_at',
+    width: 180,
+    customRender: ({ text }: { text: string }) => {
+      return new Date(text).toLocaleString('zh-CN')
+    }
+  },
+  {
+    title: '操作',
+    dataIndex: 'action',
+    width: 180,
+    fixed: 'right' as const,
+    align: 'center' as const
   }
-  return colors[category] || 'default'
-}
+]
 
-const getTierColor = (tier: string): string => {
-  const colors: Record<string, string> = {
-    core: 'gold',
-    working: 'blue',
-    peripheral: 'gray',
-  }
-  return colors[tier] || 'default'
-}
+const modalVisible = ref(false)
+const modalLoading = ref(false)
+const editingId = ref<string | null>(null)
+const modalTitle = computed(() => (editingId.value ? '编辑记忆' : '新增记忆'))
 
-const truncateContent = (content: string, maxLength = 120): string => {
-  if (content.length <= maxLength) return content
-  return content.slice(0, maxLength) + '...'
-}
+const formState = reactive({
+  content: '',
+  category: undefined as Category | undefined,
+  tier: undefined as Tier | undefined,
+  memory_type: undefined as MemoryType | undefined,
+  tags: [] as string[]
+})
 
-const formatDate = (dateStr: string): string => {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-}
-
-const goToDetail = (id: string) => {
-  router.push(`/memories/${id}`)
+const formRules = {
+  content: [{ required: true, message: '请输入内容', trigger: 'blur' }],
+  category: [{ required: true, message: '请选择分类', trigger: 'change' }],
+  tier: [{ required: true, message: '请选择层级', trigger: 'change' }],
+  memory_type: [{ required: true, message: '请选择类型', trigger: 'change' }]
 }
 
 const fetchMemories = async () => {
   loading.value = true
-  error.value = ''
-
   try {
-    const params: MemoryListParams = {
-      ...filters,
-      limit: pagination.limit,
-      offset: pagination.offset,
+    const params: any = {
+      limit: pagination.pageSize,
+      offset: (pagination.current - 1) * pagination.pageSize
     }
+    if (filters.category) params.category = filters.category
+    if (filters.tier) params.tier = filters.tier
+    if (filters.memory_type) params.memory_type = filters.memory_type
+    if (filters.state) params.state = filters.state
+    if (filters.tags) params.tags = filters.tags
+
     const response = await memoriesApi.list(params)
     memories.value = response.memories
-    totalCount.value = response.total_count
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : '获取记忆列表失败'
+    pagination.total = response.total
+  } catch (error: any) {
+    message.error(error?.error?.message || '获取记忆列表失败')
   } finally {
     loading.value = false
   }
 }
 
-const handleFilterChange = () => {
-  pagination.offset = 1
+const resetFilters = () => {
+  filters.category = undefined
+  filters.tier = undefined
+  filters.memory_type = undefined
+  filters.state = undefined
+  filters.tags = ''
+  pagination.current = 1
   fetchMemories()
 }
 
-const handlePageChange = (page: number) => {
-  pagination.offset = page
+const handleTableChange: TableProps['onChange'] = (pag) => {
+  pagination.current = pag.current || 1
+  pagination.pageSize = pag.pageSize || 12
   fetchMemories()
 }
 
-const handleSizeChange = (current: number, size: number) => {
-  pagination.limit = size
-  pagination.offset = current
-  fetchMemories()
+const openModal = (record?: Memory) => {
+  if (record) {
+    editingId.value = record.id
+    formState.content = record.content
+    formState.category = record.category
+    formState.tier = record.tier
+    formState.memory_type = record.memory_type
+    formState.tags = record.tags || []
+  } else {
+    editingId.value = null
+    formState.content = ''
+    formState.category = undefined
+    formState.tier = undefined
+    formState.memory_type = undefined
+    formState.tags = []
+  }
+  modalVisible.value = true
+}
+
+const handleModalOk = async () => {
+  try {
+    await formRef.value?.validate()
+    modalLoading.value = true
+
+    const payload: any = {
+      content: formState.content,
+      category: formState.category,
+      tier: formState.tier,
+      memory_type: formState.memory_type,
+      tags: formState.tags
+    }
+
+    if (editingId.value) {
+      await memoriesApi.update(editingId.value, payload)
+      message.success('更新成功')
+    } else {
+      await memoriesApi.create(payload)
+      message.success('创建成功')
+    }
+
+    modalVisible.value = false
+    fetchMemories()
+  } catch (error: any) {
+    if (error?.errorFields) return
+    message.error(error?.error?.message || '操作失败')
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const handleDelete = async (id: string) => {
+  try {
+    await memoriesApi.delete(id)
+    message.success('删除成功')
+    fetchMemories()
+  } catch (error: any) {
+    message.error(error?.error?.message || '删除失败')
+  }
+}
+
+const viewDetail = (id: string) => {
+  router.push(`/memories/${id}`)
+}
+
+const getCategoryColor = (category: Category) => {
+  const colors: Record<Category, string> = {
+    profile: 'blue',
+    preferences: 'green',
+    entities: 'purple',
+    events: 'orange',
+    cases: 'red',
+    patterns: 'cyan'
+  }
+  return colors[category]
+}
+
+const getTierColor = (tier: Tier) => {
+  const colors: Record<Tier, string> = {
+    core: 'gold',
+    working: 'blue',
+    peripheral: 'default'
+  }
+  return colors[tier]
 }
 
 onMounted(() => {
@@ -243,91 +401,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.memory-list-container {
+.memory-list {
   padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
-.header {
-  margin-bottom: 24px;
+.content-cell {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 4px 0;
-  letter-spacing: -0.5px;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.filters-section {
-  background: #fff;
-  padding: 16px;
-  border-radius: 8px;
-  margin-bottom: 24px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.loading-state,
-.error-state,
-.empty-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 300px;
-}
-
-.memory-grid {
-  margin-bottom: 24px;
-}
-
-.memory-card {
-  height: 100%;
-  cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-
-.memory-card:hover {
-  transform: translateY(-2px);
-}
-
-.card-header {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.category-tag,
-.tier-tag {
-  font-size: 12px;
-}
-
-.memory-content {
-  font-size: 14px;
-  color: #444;
-  line-height: 1.5;
-  margin: 0 0 12px 0;
-  min-height: 63px;
-}
-
-.card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  color: #999;
-}
-
-.pagination-section {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 16px;
+:deep(.ant-table) {
+  --ant-table-header-bg: #fafafa;
+  --ant-table-row-hover-bg: #e6f7ff;
 }
 </style>
