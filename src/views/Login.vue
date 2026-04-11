@@ -1,163 +1,84 @@
 <template>
   <div class="login-container">
-    <div class="login-card">
-      <div class="card-header">
-        <h1 class="app-title">omem</h1>
-        <p class="app-subtitle">Connect to your memory server</p>
-      </div>
-
+    <a-card title="登录 omem" :bordered="false" style="width: 400px">
       <a-form
-        ref="formRef"
         :model="formState"
         :rules="rules"
-        layout="vertical"
         @finish="handleLogin"
+        layout="vertical"
       >
-        <a-form-item label="API URL" name="apiUrl">
-          <a-input
-            v-model:value="formState.apiUrl"
-            placeholder="https://api.example.com"
-            size="large"
-          >
-            <template #prefix>
-              <LinkOutlined />
-            </template>
-          </a-input>
-        </a-form-item>
-
         <a-form-item label="API Key" name="apiKey">
           <a-input-password
             v-model:value="formState.apiKey"
-            placeholder="Enter your API key"
+            placeholder="请输入 API Key"
             size="large"
-          >
-            <template #prefix>
-              <KeyOutlined />
-            </template>
-          </a-input-password>
-        </a-form-item>
-
-        <a-form-item label="Username (optional)" name="username">
-          <a-input
-            v-model:value="formState.username"
-            placeholder="Display name for this connection"
-            size="large"
-          >
-            <template #prefix>
-              <UserOutlined />
-            </template>
-          </a-input>
+          />
         </a-form-item>
 
         <a-form-item>
           <a-button
             type="primary"
             html-type="submit"
-            size="large"
-            block
             :loading="loading"
+            block
+            size="large"
           >
-            {{ loading ? 'Connecting...' : 'Connect' }}
+            登录
           </a-button>
         </a-form-item>
       </a-form>
-
-      <div v-if="errorMessage" class="error-message">
-        <AlertOutlined />
-        <span>{{ errorMessage }}</span>
-      </div>
-    </div>
+    </a-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import axios from 'axios'
-import type { FormInstance, Rule } from 'ant-design-vue/es/form'
-import { LinkOutlined, KeyOutlined, UserOutlined, AlertOutlined } from '@ant-design/icons-vue'
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
-import type { User } from '@/types/user'
+import { profileApi } from '@/api/profile'
 import { updateBaseURL } from '@/api/client'
+import axios from 'axios'
 
 const router = useRouter()
-const route = useRoute()
 const authStore = useAuthStore()
-
-const formRef = ref<FormInstance>()
 const loading = ref(false)
-const errorMessage = ref('')
 
 const formState = reactive({
-  apiUrl: '',
-  apiKey: '',
-  username: '',
+  apiKey: ''
 })
 
-const validateApiUrl = async (_rule: Rule, value: string): Promise<void> => {
-  if (!value) {
-    throw new Error('API URL is required')
-  }
-  try {
-    new URL(value)
-  } catch {
-    throw new Error('Please enter a valid URL')
-  }
+const rules = {
+  apiKey: [{ required: true, message: '请输入 API Key', trigger: 'blur' }]
 }
 
-const rules: Record<string, Rule[]> = {
-  apiUrl: [{ required: true, validator: validateApiUrl, trigger: 'change' }],
-  apiKey: [{ required: true, message: 'API Key is required', trigger: 'change' }],
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://www.mengxy.cc'
 
 const handleLogin = async () => {
-  errorMessage.value = ''
   loading.value = true
-
   try {
-    // Validate connection by calling health endpoint
-    const healthUrl = `${formState.apiUrl.replace(/\/$/, '')}/health`
+    const healthUrl = `${API_BASE_URL}/health`
     await axios.get(healthUrl, {
-      headers: {
-        'X-API-Key': formState.apiKey,
-      },
-      timeout: 10000,
+      headers: { 'X-API-Key': formState.apiKey }
     })
 
-    // Create user object
-    const user: User = {
-      id: `${Date.now()}`,
-      name: formState.username || new URL(formState.apiUrl).hostname,
+    updateBaseURL(API_BASE_URL)
+
+    const profile = await profileApi.get()
+
+    authStore.addUser({
+      id: formState.apiKey.substring(0, 8),
+      name: profile.name || 'Unknown User',
       api_key: formState.apiKey,
-      api_url: formState.apiUrl.replace(/\/$/, ''),
-      last_used: new Date().toISOString(),
-    }
+      api_url: API_BASE_URL,
+      last_used: new Date().toISOString()
+    })
 
-    // Add user to auth store
-    authStore.addUser(user)
-
-    // Update API client baseURL
-    updateBaseURL(user.api_url)
-
-    // Redirect to intended page or home
-    const redirect = route.query.redirect as string
-    router.push(redirect || '/memories')
-  } catch (err: unknown) {
-    if (axios.isAxiosError(err)) {
-      if (err.code === 'ECONNABORTED') {
-        errorMessage.value = 'Connection timeout. Please check your API URL.'
-      } else if (err.response?.status === 401) {
-        errorMessage.value = 'Invalid API key'
-      } else if (err.response?.status === 404) {
-        errorMessage.value = 'API endpoint not found. Please check your API URL.'
-      } else {
-        errorMessage.value = err.response?.data?.error?.message || 'Failed to connect to server'
-      }
-    } else if (err instanceof Error) {
-      errorMessage.value = err.message || 'Failed to connect'
-    } else {
-      errorMessage.value = 'Failed to connect to server'
-    }
+    message.success('登录成功')
+    router.push('/memories')
+  } catch (error: any) {
+    console.error('Login failed:', error)
+    message.error(error?.error?.message || '登录失败，请检查 API Key')
   } finally {
     loading.value = false
   }
@@ -166,52 +87,10 @@ const handleLogin = async () => {
 
 <style scoped>
 .login-container {
-  min-height: 100vh;
   display: flex;
-  align-items: center;
   justify-content: center;
-  background: #f5f5f5;
-  padding: 20px;
-}
-
-.login-card {
-  width: 100%;
-  max-width: 420px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  padding: 40px;
-}
-
-.card-header {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.app-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: #1a1a1a;
-  margin: 0 0 8px 0;
-  letter-spacing: -0.5px;
-}
-
-.app-subtitle {
-  font-size: 14px;
-  color: #666;
-  margin: 0;
-}
-
-.error-message {
-  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
-  border-radius: 4px;
-  color: #ff4d4f;
-  font-size: 14px;
-  margin-top: 16px;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 </style>
