@@ -13,9 +13,15 @@ const client: AxiosInstance = axios.create({
 client.interceptors.request.use(
   (config) => {
     const apiKey = localStorage.getItem('current_api_key')
-    if (apiKey) {
-      config.headers['X-API-Key'] = apiKey
+    if (!apiKey) {
+      return Promise.reject({
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: 'API Key not configured',
+        },
+      })
     }
+    config.headers['X-API-Key'] = apiKey
     return config
   },
   (error) => Promise.reject(error)
@@ -25,10 +31,22 @@ client.interceptors.request.use(
 client.interceptors.response.use(
   (response) => response,
   (error: AxiosError<ApiError>) => {
+    // 处理网络错误、超时等无 response 的情况
+    if (!error.response) {
+      const apiError: ApiError = {
+        error: {
+          code: 'UNKNOWN_ERROR',
+          message: error.message || 'Network request failed',
+        },
+      }
+      return Promise.reject(apiError)
+    }
+
+    // 处理有 response 的情况
     const apiError: ApiError = {
       error: {
-        code: error.response?.data?.error?.code || 'UNKNOWN_ERROR',
-        message: error.response?.data?.error?.message || error.message || 'Unknown error',
+        code: error.response.data?.error?.code || 'UNKNOWN_ERROR',
+        message: error.response.data?.error?.message || error.message || 'Unknown error',
       },
     }
     return Promise.reject(apiError)
