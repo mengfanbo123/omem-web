@@ -37,8 +37,8 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
 import { profileApi } from '@/api/profile'
-import { updateBaseURL } from '@/api/client'
-import axios from 'axios'
+import { memoriesApi } from '@/api/memories'
+import client, { updateBaseURL } from '@/api/client'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -57,15 +57,19 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://www.mengxy.cc
 const handleLogin = async () => {
   loading.value = true
   try {
-    const healthUrl = `${API_BASE_URL}/health`
-    await axios.get(healthUrl, {
-      headers: { 'X-API-Key': formState.apiKey }
-    })
-
+    // 临时设置 API Key 到 client headers
+    client.defaults.headers.common['X-API-Key'] = formState.apiKey
+    
+    // 更新 baseURL
     updateBaseURL(API_BASE_URL)
 
+    // 测试连接（使用 memoriesApi.health）
+    await memoriesApi.health()
+
+    // 获取用户信息
     const profile = await profileApi.get()
 
+    // 保存用户到 store
     authStore.addUser({
       id: formState.apiKey.substring(0, 8),
       name: profile.name || 'Unknown User',
@@ -78,7 +82,7 @@ const handleLogin = async () => {
     router.push('/memories')
   } catch (error: any) {
     console.error('Login failed:', error)
-    message.error(error?.error?.message || '登录失败，请检查 API Key')
+    message.error(error?.response?.data?.error?.message || error?.message || '登录失败，请检查 API Key')
   } finally {
     loading.value = false
   }

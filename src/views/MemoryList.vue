@@ -1,6 +1,7 @@
 <template>
   <div class="memory-list">
-    <a-card :bordered="false">
+    <!-- 筛选器 -->
+    <div class="filter-bar">
       <a-form layout="inline" style="margin-bottom: 16px">
         <a-form-item label="分类">
           <a-select
@@ -52,42 +53,42 @@
           <a-button type="primary" style="margin-left: 8px" @click="openModal()">新增记忆</a-button>
         </a-form-item>
       </a-form>
+    </div>
 
-      <a-table
-        :columns="columns"
-        :data-source="memories"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="(record) => record.id"
-        bordered
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.dataIndex === 'category'">
-            <a-tag :color="getCategoryColor(record.category)">
+    <!-- 卡片列表 -->
+    <a-row :gutter="[16, 16]" class="card-grid">
+      <a-col v-for="record in memories" :key="record.id" :xs="24" :sm="12" :md="8" :lg="6">
+        <a-card class="memory-card" hoverable @click="viewDetail(record.id)">
+          <!-- 卡片头部：分类/层级/类型标签 -->
+          <div class="card-header">
+            <a-tag :color="getCategoryColor(record.category)" class="category-tag">
               {{ CATEGORY_LABELS[record.category] }}
             </a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'tier'">
-            <a-tag :color="getTierColor(record.tier)">
+            <a-tag :color="getTierColor(record.tier)" class="tier-tag">
               {{ TIER_LABELS[record.tier] }}
             </a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'memory_type'">
-            <a-tag>{{ MEMORY_TYPE_LABELS[record.memory_type] }}</a-tag>
-          </template>
-          <template v-else-if="column.dataIndex === 'content'">
-            <div class="content-cell">{{ record.content }}</div>
-          </template>
-          <template v-else-if="column.dataIndex === 'tags'">
-            <a-tag v-for="tag in record.tags?.slice(0, 3)" :key="tag" color="blue">
+            <a-tag class="type-tag">
+              {{ MEMORY_TYPE_LABELS[record.memory_type] }}
+            </a-tag>
+          </div>
+
+          <!-- 卡片内容 -->
+          <div class="card-content">
+            <p class="content-preview">{{ record.l0_abstract || record.content }}</p>
+          </div>
+
+          <!-- 卡片标签 -->
+          <div class="card-tags" v-if="record.tags && record.tags.length > 0">
+            <a-tag v-for="tag in record.tags.slice(0, 4)" :key="tag" color="blue" class="tag-item">
               {{ tag }}
             </a-tag>
-            <span v-if="record.tags && record.tags.length > 3">...</span>
-          </template>
-          <template v-else-if="column.dataIndex === 'action'">
-            <a-space>
+            <span v-if="record.tags.length > 4" class="more-tags">+{{ record.tags.length - 4 }}</span>
+          </div>
+
+          <!-- 卡片底部 -->
+          <div class="card-footer">
+            <span class="create-time">{{ formatDate(record.created_at) }}</span>
+            <a-space class="card-actions" @click.stop>
               <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
               <a-popconfirm
                 title="确定要删除这条记忆吗？"
@@ -97,13 +98,30 @@
               >
                 <a-button type="link" size="small" danger>删除</a-button>
               </a-popconfirm>
-              <a-button type="link" size="small" @click="viewDetail(record.id)">详情</a-button>
             </a-space>
-          </template>
-        </template>
-      </a-table>
-    </a-card>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
 
+    <!-- 空状态 -->
+    <a-empty v-if="!loading && memories.length === 0" description="暂无记忆" class="empty-state" />
+
+    <!-- 分页器 -->
+    <div class="pagination-wrapper" v-if="memories.length > 0">
+      <a-pagination
+        v-model:current="pagination.current"
+        v-model:pageSize="pagination.pageSize"
+        :total="pagination.total"
+        :show-size-changer="true"
+        :page-size-options="['12', '24', '48', '96']"
+        @change="handlePageChange"
+        @showSizeChange="handleSizeChange"
+        show-quick-jumper
+      />
+    </div>
+
+    <!-- 编辑/新增弹窗 -->
     <a-modal
       v-model:open="modalVisible"
       :title="modalTitle"
@@ -171,7 +189,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import type { TableProps, FormInstance } from 'ant-design-vue'
+import type { FormInstance } from 'ant-design-vue'
 import { memoriesApi } from '@/api/memories'
 import type { Memory, Category, Tier, MemoryType } from '@/types/memory'
 import {
@@ -204,52 +222,6 @@ const pagination = reactive({
   showSizeChanger: true,
   pageSizeOptions: ['12', '24', '48', '96']
 })
-
-const columns = [
-  {
-    title: '分类',
-    dataIndex: 'category',
-    width: 100,
-    align: 'center' as const
-  },
-  {
-    title: '层级',
-    dataIndex: 'tier',
-    width: 80,
-    align: 'center' as const
-  },
-  {
-    title: '类型',
-    dataIndex: 'memory_type',
-    width: 80,
-    align: 'center' as const
-  },
-  {
-    title: '内容',
-    dataIndex: 'content',
-    ellipsis: true
-  },
-  {
-    title: '标签',
-    dataIndex: 'tags',
-    width: 200
-  },
-  {
-    title: '创建时间',
-    dataIndex: 'created_at',
-    width: 180,
-    customRender: ({ text }: { text: string }) => {
-      return new Date(text).toLocaleString('zh-CN')
-    }
-  },
-  {
-    title: '操作',
-    dataIndex: 'action',
-    width: 180,
-    fixed: 'right' as const,
-    align: 'center' as const
-  }
-]
 
 const modalVisible = ref(false)
 const modalLoading = ref(false)
@@ -304,9 +276,15 @@ const resetFilters = () => {
   fetchMemories()
 }
 
-const handleTableChange: TableProps['onChange'] = (pag) => {
-  pagination.current = pag.current || 1
-  pagination.pageSize = pag.pageSize || 12
+const handlePageChange = (page: number, pageSize: number) => {
+  pagination.current = page
+  pagination.pageSize = pageSize
+  fetchMemories()
+}
+
+const handleSizeChange = (current: number, size: number) => {
+  pagination.pageSize = size
+  pagination.current = 1
   fetchMemories()
 }
 
@@ -317,7 +295,7 @@ const openModal = (record?: Memory) => {
     formState.category = record.category
     formState.tier = record.tier
     formState.memory_type = record.memory_type
-    formState.tags = record.tags || []
+    formState.tags = record.tags ? [...record.tags] : []
   } else {
     editingId.value = null
     formState.content = ''
@@ -334,12 +312,14 @@ const handleModalOk = async () => {
     await formRef.value?.validate()
     modalLoading.value = true
 
-    const payload: any = {
+    // BUG FIX: 确保所有字段都被正确包含在 payload 中
+    // 使用扩展运算符确保 undefined 字段被显式传递
+    const payload = {
       content: formState.content,
-      category: formState.category,
-      tier: formState.tier,
-      memory_type: formState.memory_type,
-      tags: formState.tags
+      category: formState.category!,
+      tier: formState.tier!,
+      memory_type: formState.memory_type!,
+      tags: formState.tags ? [...formState.tags] : []
     }
 
     if (editingId.value) {
@@ -374,6 +354,12 @@ const viewDetail = (id: string) => {
   router.push(`/memories/${id}`)
 }
 
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
 const getCategoryColor = (category: Category) => {
   const colors: Record<Category, string> = {
     profile: 'blue',
@@ -403,17 +389,116 @@ onMounted(() => {
 <style scoped>
 .memory-list {
   padding: 24px;
+  min-height: calc(100vh - 100px);
 }
 
-.content-cell {
-  max-width: 400px;
+.filter-bar {
+  margin-bottom: 24px;
+}
+
+.card-grid {
+  margin-bottom: 24px;
+}
+
+.memory-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #f0f0f0);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.memory-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border-color: var(--primary-color, #1890ff);
+}
+
+.card-header {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.category-tag,
+.tier-tag,
+.type-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.card-content {
+  flex: 1;
+  margin-bottom: 12px;
+}
+
+.content-preview {
+  color: var(--text-color, rgba(0, 0, 0, 0.85));
+  font-size: 14px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  margin: 0;
 }
 
-:deep(.ant-table) {
-  --ant-table-header-bg: #fafafa;
-  --ant-table-row-hover-bg: #e6f7ff;
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.tag-item {
+  font-size: 11px;
+  margin: 0;
+}
+
+.more-tags {
+  font-size: 11px;
+  color: var(--text-color-secondary, rgba(0, 0, 0, 0.45));
+  line-height: 22px;
+}
+
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color, #f0f0f0);
+}
+
+.create-time {
+  font-size: 12px;
+  color: var(--text-color-secondary, rgba(0, 0, 0, 0.45));
+}
+
+.card-actions {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.memory-card:hover .card-actions {
+  opacity: 1;
+}
+
+.empty-state {
+  padding: 60px 0;
+}
+
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+:deep(.ant-card-body) {
+  padding: 16px;
 }
 </style>
