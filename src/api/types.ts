@@ -27,5 +27,5 @@ export interface MemoryListParams {
 }
 
 export interface HealthResponse {
-  status: string
+  status: 'healthy' | 'degraded' | 'unhealthy'
 }
