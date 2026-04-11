@@ -2,7 +2,7 @@ import type { Memory } from '@/types/memory'
 
 export interface ApiError {
   error: {
-    code: 'validation_error' | 'unauthorized' | 'not_found' | 'rate_limited' | 'internal_error'
+    code: 'validation_error' | 'unauthorized' | 'not_found' | 'rate_limited' | 'internal_error' | 'UNKNOWN_ERROR'
     message: string
   }
 }
