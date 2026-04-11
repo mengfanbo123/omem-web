@@ -78,6 +78,7 @@ import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { LinkOutlined, KeyOutlined, UserOutlined, AlertOutlined } from '@ant-design/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { User } from '@/types/user'
+import { updateBaseURL } from '@/api/client'
 
 const router = useRouter()
 const route = useRoute()
@@ -134,6 +135,9 @@ const handleLogin = async () => {
 
     // Add user to auth store
     authStore.addUser(user)
+
+    // Update API client baseURL
+    updateBaseURL(user.api_url)
 
     // Redirect to intended page or home
     const redirect = route.query.redirect as string

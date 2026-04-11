@@ -51,4 +51,8 @@ client.interceptors.response.use(
   }
 )
 
+export function updateBaseURL(url: string) {
+  client.defaults.baseURL = url
+}
+
 export default client
