@@ -1,0 +1,456 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e7]:
+          - generic [ref=e8]: 🧠
+          - generic [ref=e9]: omem
+        - menu [ref=e10]:
+          - menuitem "dashboard 仪表盘" [ref=e11] [cursor=pointer]:
+            - img "dashboard" [ref=e12]:
+              - img [ref=e13]
+            - generic [ref=e15]: 仪表盘
+          - menuitem "database 记忆列表" [ref=e16] [cursor=pointer]:
+            - img "database" [ref=e17]:
+              - img [ref=e18]
+            - generic [ref=e20]: 记忆列表
+          - menuitem "home 空间管理" [ref=e21] [cursor=pointer]:
+            - img "home" [ref=e22]:
+              - img [ref=e23]
+            - generic [ref=e25]: 空间管理
+          - listitem [ref=e26]
+          - menuitem "bar-chart 统计分析" [ref=e27] [cursor=pointer]:
+            - img "bar-chart" [ref=e28]:
+              - img [ref=e29]
+            - generic [ref=e31]: 统计分析
+          - menuitem "upload 批量导入" [ref=e32] [cursor=pointer]:
+            - img "upload" [ref=e33]:
+              - img [ref=e34]
+            - generic [ref=e36]: 批量导入
+          - listitem [ref=e37]
+          - menuitem "setting 系统设置" [ref=e38] [cursor=pointer]:
+            - img "setting" [ref=e39]:
+              - img [ref=e40]
+            - generic [ref=e42]: 系统设置
+        - generic [ref=e43] [cursor=pointer]:
+          - img "menu-fold" [ref=e44]:
+            - img [ref=e45]
+          - generic [ref=e47]: 收起
+    - generic [ref=e48]:
+      - generic [ref=e49]:
+        - img "menu-fold" [ref=e51] [cursor=pointer]:
+          - img [ref=e52]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - img "search" [ref=e59]:
+              - img [ref=e60]
+            - textbox "搜索记忆..." [ref=e62]
+          - button "search" [ref=e64] [cursor=pointer]:
+            - img "search" [ref=e65]:
+              - img [ref=e66]
+        - generic [ref=e68]:
+          - generic [ref=e69] [cursor=pointer]:
+            - generic [ref=e71]: U
+            - generic [ref=e72]: Unknown User
+            - img "down" [ref=e73]:
+              - img [ref=e74]
+          - separator [ref=e76]
+          - button "logout 退出" [ref=e77] [cursor=pointer]:
+            - img "logout" [ref=e78]:
+              - img [ref=e79]
+            - generic [ref=e81]: 退出
+      - main [ref=e82]:
+        - generic [ref=e83]:
+          - generic [ref=e85]:
+            - generic [ref=e87]:
+              - generic "分类" [ref=e89]: "分类 :"
+              - generic [ref=e93] [cursor=pointer]:
+                - generic [ref=e94]:
+                  - combobox [ref=e96]
+                  - generic: 全部
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e98]:
+              - generic "层级" [ref=e100]: "层级 :"
+              - generic [ref=e104] [cursor=pointer]:
+                - generic [ref=e105]:
+                  - combobox [ref=e107]
+                  - generic: 全部
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e109]:
+              - generic "类型" [ref=e111]: "类型 :"
+              - generic [ref=e115] [cursor=pointer]:
+                - generic [ref=e116]:
+                  - combobox [ref=e118]
+                  - generic: 全部
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e120]:
+              - generic "状态" [ref=e122]: "状态 :"
+              - generic [ref=e126] [cursor=pointer]:
+                - generic [ref=e127]:
+                  - combobox [ref=e129]
+                  - generic: 全部
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e131]:
+              - generic "标签" [ref=e133]: "标签 :"
+              - textbox "输入标签" [ref=e138]
+            - generic [ref=e144]:
+              - button "查 询" [ref=e145] [cursor=pointer]:
+                - generic [ref=e146]: 查 询
+              - button "重 置" [ref=e147] [cursor=pointer]:
+                - generic [ref=e148]: 重 置
+              - button "新增记忆" [ref=e149] [cursor=pointer]:
+                - generic [ref=e150]: 新增记忆
+          - generic [ref=e151]:
+            - generic [ref=e154] [cursor=pointer]:
+              - generic [ref=e155]:
+                - generic [ref=e156]: 偏好设置
+                - generic [ref=e157]: 外围
+                - generic [ref=e158]: 置顶
+              - paragraph [ref=e160]: 【用户双重身份机制-FR010补充-关键约束❗】 1. 用户概念：商家、消费者统称为用户，所有用户都拥有消费者身份 2. 商家双重身份：商家既有商家身份(shop_id)，也有消费者身份(user_id) 3. 商家登录农服平台客户端：以消费者身份登录，查询积分=商家身份积分+消费者身份积分(UNION ALL) 4. 商家积分释放：消费者在该商家消费后，定时释放的积分要释放到商家的积分表和消费券表(商家身份) 5. 商家作为消费者消费：该商家用消费者身份在平台消费，返利机制和正常消费者一样 6. 支付接口需求：提供按组合身份查询各积分的接口，判断当前用户是否拥有商家身份 7. 支付时消费券返回：如果用户拥有商家身份，则返回"商家身份可用消费券+消费者身份可用消费券"分别返回给前端 8. 表设计影响：需要通过user_id关联查询该用户是否有对应的shop_id(商家身份)
+              - generic [ref=e161]:
+                - generic [ref=e162]: omem_user_0ee0672825776c81
+                - generic [ref=e163]: omem_project_4f10fd72627def04
+                - generic [ref=e164]: 积分模块
+                - generic [ref=e165]: 双重身份
+                - generic [ref=e166]: "+3"
+              - generic [ref=e167]:
+                - generic [ref=e168]: 4月11日 23:24
+                - generic [ref=e169]:
+                  - button "编辑" [ref=e171]:
+                    - generic [ref=e172]: 编辑
+                  - button "删除" [ref=e174]:
+                    - generic [ref=e175]: 删除
+            - generic [ref=e178] [cursor=pointer]:
+              - generic [ref=e179]:
+                - generic [ref=e180]: 偏好设置
+                - generic [ref=e181]: 外围
+                - generic [ref=e182]: 置顶
+              - paragraph [ref=e184]: "【消费券过期与退款-FR015~016】 1. FR-015过期处理：xxl-job定时任务(每日2:00)，扫描status=UNUSED且valid_until<NOW()的券，更新为EXPIRED 2. 过期积分回收：从source字段追溯原积分账户(格式POINT::{accountId})扣减，余额不足扣至0，记录差额日志 3. 过期流水：point_transaction(type=EXPIRE,amount负数)、platform_point_record(平台收益)、coupon_expire_log(过期日志) 4. 并发控制：Redis分布式锁(coupon:expire:lock:{日期})，30分钟过期，CAS更新券状态 5. FR-016纯券退款：订单pay_type=COUPON_ONLY，退款积分=coupon.balance原路返回用户积分账户 6. 全额退款回滚：fund_pool.balance -= D×0.5，消费者/商家frozen各-= D×0.5(D=订单金额×让利比例r) 7. 冻结积分不足处理：扣减至0不阻塞退款，记录扣减日志 8. 退款记录表：refund_record(refund_no/order_id/user_id/refund_type/coupon_refund/cash_refund/status) 9. 退款状态流转：PENDING→PROCESSING→COMPLETED/FAILED 10. 幂等保护：Redis锁(point:lock:refund:order:{orderId}) + refund_record表去重"
+              - generic [ref=e185]:
+                - generic [ref=e186]: omem_user_0ee0672825776c81
+                - generic [ref=e187]: omem_project_4f10fd72627def04
+                - generic [ref=e188]: 积分模块
+                - generic [ref=e189]: 消费券过期
+                - generic [ref=e190]: "+2"
+              - generic [ref=e191]:
+                - generic [ref=e192]: 4月11日 23:15
+                - generic [ref=e193]:
+                  - button "编辑" [ref=e195]:
+                    - generic [ref=e196]: 编辑
+                  - button "删除" [ref=e198]:
+                    - generic [ref=e199]: 删除
+            - generic [ref=e202] [cursor=pointer]:
+              - generic [ref=e203]:
+                - generic [ref=e204]: 偏好设置
+                - generic [ref=e205]: 外围
+                - generic [ref=e206]: 置顶
+              - paragraph [ref=e208]: "【全局参数配置管理-FR009】 1. 参数存储：复用mall4j的tz_sys_config表(不是sys_config！)，字段：id/param_key/param_value/param_type/remark 2. 参数键前缀规范：point.kvalue.*、point.release.*、point.validity.* 3. Lambda参数独立表：param_lambda(factor_count/beta_decay)、param_lambda_factor(因子权重/算法类型) 4. 变更审计：parameter_change_log表记录所有参数变更(param_key/old_value/new_value/operator/remark) 5. 实时生效：参数修改后清除缓存，下次业务调用重新加载 6. 并发控制：Redis分布式锁(param:lock:update:{paramModule})，10秒过期 7. 事务边界：参数更新+日志写入同一事务，afterCommit清除缓存 8. 关键参数：deduct_ratio(0.8抵扣比例)、order_min(10元最低订单)、validity_days(30天消费券有效期) 9. 分配比例联动：consumer_ratio + merchant_ratio = 1.0必须校验 10. k值变更额外记录：修改k值参数时同时写入k_value_adjust_log表"
+              - generic [ref=e209]:
+                - generic [ref=e210]: omem_user_0ee0672825776c81
+                - generic [ref=e211]: omem_project_4f10fd72627def04
+                - generic [ref=e212]: 积分模块
+                - generic [ref=e213]: 参数配置
+                - generic [ref=e214]: "+2"
+              - generic [ref=e215]:
+                - generic [ref=e216]: 4月11日 23:13
+                - generic [ref=e217]:
+                  - button "编辑" [ref=e219]:
+                    - generic [ref=e220]: 编辑
+                  - button "删除" [ref=e222]:
+                    - generic [ref=e223]: 删除
+            - generic [ref=e226] [cursor=pointer]:
+              - generic [ref=e227]:
+                - generic [ref=e228]: 偏好设置
+                - generic [ref=e229]: 外围
+                - generic [ref=e230]: 置顶
+              - paragraph [ref=e232]: 【mall4j用户ID类型规则-关键约束❗】 1. 消费者用户ID：VARCHAR(36)类型（可能是UUID格式） 2. 商户ID(shopId)：BIGINT类型 3. 设计表时必须严格遵守： - 涉及消费者的表：user_id字段用VARCHAR(36) - 涉及商户的表：shop_id字段用BIGINT - 双账户表(如point_account_consumer/point_account_merchant)必须分别使用对应类型 4. 已读文档中需要修正的地方： - FR-001~008中所有涉及userId的表设计需按此规则调整 - 消费者表：user_id VARCHAR(36) - 商家表：shop_id BIGINT 5. 这是mall4j原有架构约束，积分模块必须适配！
+              - generic [ref=e233]:
+                - generic [ref=e234]: omem_user_0ee0672825776c81
+                - generic [ref=e235]: omem_project_4f10fd72627def04
+                - generic [ref=e236]: mall4j架构
+                - generic [ref=e237]: 表设计规范
+                - generic [ref=e238]: "+2"
+              - generic [ref=e239]:
+                - generic [ref=e240]: 4月11日 23:13
+                - generic [ref=e241]:
+                  - button "编辑" [ref=e243]:
+                    - generic [ref=e244]: 编辑
+                  - button "删除" [ref=e246]:
+                    - generic [ref=e247]: 删除
+            - generic [ref=e250] [cursor=pointer]:
+              - generic [ref=e251]:
+                - generic [ref=e252]: 偏好设置
+                - generic [ref=e253]: 外围
+                - generic [ref=e254]: 置顶
+              - paragraph [ref=e256]: "【消费券核销机制-FR008】 1. 核销触发：订单支付时同步调用内部API，订单金额≥order_min(10元)才触发 2. 核销算法：maxDeductible=orderAmount×deduct_ratio(0.8)，按valid_until ASC排序(先过期先用)，逐张核销直至可抵扣额度耗尽 3. 不找零规则：券余额>剩余可抵扣时，仅核销剩余可抵扣金额，差额不退还 4. 状态流转：UNUSED→USED(余额清零)，余额未清零保持UNUSED 5. 并发控制：Redis锁(coupon:lock:consume:{userId}:{orderId})+ 乐观锁(status=UNUSED条件更新) 6. 幂等保护：event_deduplicate + orderId维度去重(coupon_consume表) 7. 事务边界：单一本地事务，包含券明细更新、主表余额扣减、核销记录写入、流水记录 8. 乐观锁重试：更新券明细时重试3次，全部冲突则跳过该券继续下一张 9. 核销记录表：coupon_consume(consume_no/coupon_id/order_id/consume_amount/status) 10. 配置参数：deduct_ratio(0.8)、order_min(10)存储在param_release表"
+              - generic [ref=e257]:
+                - generic [ref=e258]: omem_user_0ee0672825776c81
+                - generic [ref=e259]: omem_project_4f10fd72627def04
+                - generic [ref=e260]: 积分模块
+                - generic [ref=e261]: 消费券核销
+                - generic [ref=e262]: "+2"
+              - generic [ref=e263]:
+                - generic [ref=e264]: 4月11日 23:12
+                - generic [ref=e265]:
+                  - button "编辑" [ref=e267]:
+                    - generic [ref=e268]: 编辑
+                  - button "删除" [ref=e270]:
+                    - generic [ref=e271]: 删除
+            - generic [ref=e274] [cursor=pointer]:
+              - generic [ref=e275]:
+                - generic [ref=e276]: 偏好设置
+                - generic [ref=e277]: 外围
+                - generic [ref=e278]: 置顶
+              - paragraph [ref=e280]: 【消费券发放机制-FR007+mall4j配置规范】 1. 消费券账本模型：coupon_batch(批次) → coupon(主表) → coupon_detail(明细) → coupon_transaction(流水) 2. 物理分表：消费者和商家完全分离，coupon_consumer/coupon_merchant、coupon_detail_consumer/coupon_detail_merchant、coupon_batch_consumer/coupon_batch_merchant 3. 积分与消费券关系：积分balance仅显示用，消费券有独立总表(balance)和明细表，抵扣时按"即将过期优先"原则使用明细，完全抵扣标记USED，部分抵扣标记PARTIAL_USED 4. 编号生成：couponNo/detailNo/transactionNo统一使用雪花ID 5. 批次合并：同business_type+同release_date合并到同一批次 6. 有效期：valid_until = valid_from + validity_days(默认30天) 7. mall4j配置表：tz_sys_config(不是sys_config！)，仅4字段(id/param_key/param_value/remark)，无param_type字段 8. 配置命名规范：全大写+下划线分隔(如SCORE_CONFIG)，复杂配置用JSON存储在param_value(mediumtext) 9. 配置热更新：Spring Cache机制，调用updateValueByKey自动清除缓存 10. 积分模块配置建议：复用tz_sys_config表，key建议POINT_CONFIG/POINT_EXPIRE_CONFIG等
+              - generic [ref=e281]:
+                - generic [ref=e282]: omem_user_0ee0672825776c81
+                - generic [ref=e283]: omem_project_4f10fd72627def04
+                - generic [ref=e284]: 积分模块
+                - generic [ref=e285]: 消费券
+                - generic [ref=e286]: "+2"
+              - generic [ref=e287]:
+                - generic [ref=e288]: 4月11日 23:12
+                - generic [ref=e289]:
+                  - button "编辑" [ref=e291]:
+                    - generic [ref=e292]: 编辑
+                  - button "删除" [ref=e294]:
+                    - generic [ref=e295]: 删除
+            - generic [ref=e298] [cursor=pointer]:
+              - generic [ref=e299]:
+                - generic [ref=e300]: 偏好设置
+                - generic [ref=e301]: 外围
+                - generic [ref=e302]: 置顶
+              - paragraph [ref=e304]: "【绿色积分核心机制-FR005~006】 1. 绿色积分特性：1:1锚定(1元=1积分)、永久有效、不膨胀、必须上链蚂蚁链 2. 算法配置：支持固定比例/阶梯/自定义三种算法，按商品/店铺维度差异化配置 3. 链上幂等：合约processedTx[bizId]防重放，本地event_deduplicate防MQ重复投递，双重保险 4. userId映射：消费者NF_C_{userId}，商家NF_M_{shopId}，按类型区分前缀避免冲突 5. 事务一致性：本地积分增加与链上发放必须在同一事务，本地失败则链上不传，需重试+人工干预 6. 配置存储：复用mall4j的sys_config表，需探查其表结构和命名规范 7. 蚂蚁链SDK：mychainx-sdk-java-all 0.10.2.24.5，Solidity 0.4.24合约 8. 链上合约：GreenPointContract，支持issuePoints/consumePoints/compensatePoints/queryBalance"
+              - generic [ref=e305]:
+                - generic [ref=e306]: omem_user_0ee0672825776c81
+                - generic [ref=e307]: omem_project_4f10fd72627def04
+                - generic [ref=e308]: 积分模块
+                - generic [ref=e309]: 绿色积分
+                - generic [ref=e310]: "+2"
+              - generic [ref=e311]:
+                - generic [ref=e312]: 4月11日 23:00
+                - generic [ref=e313]:
+                  - button "编辑" [ref=e315]:
+                    - generic [ref=e316]: 编辑
+                  - button "删除" [ref=e318]:
+                    - generic [ref=e319]: 删除
+            - generic [ref=e322] [cursor=pointer]:
+              - generic [ref=e323]:
+                - generic [ref=e324]: 偏好设置
+                - generic [ref=e325]: 外围
+                - generic [ref=e326]: 置顶
+              - paragraph [ref=e328]: 【积分模块核心机制-FR001~004】 1. 积分发放(FR-001)：分佣完成后，资金池净流水L=进资金池J-补贴商家K，若L>0则消费者和商家各冻结L积分(1:1发放) 2. 积分释放机制： - 消费者：FR-003A即时释放(5秒延迟) + FR-004A每日集中释放 - 商家：FR-004B每日集中释放(无即时释放) 3. k值杠杆机制：发放1积分冻结，释放时可释放k积分可用(frozen_i -= M/k, balance_i += M) 4. k值分类：消费者k值和商家k值独立，FR-002调整时需分别计算 5. 分佣表依赖：distribution_record表暂按文档设计，联调时再调整 6. 公式链：C=A-B, E=A×r, J=E×0.5, L=J-C, M=N=IF(L>0,L,0)
+              - generic [ref=e329]:
+                - generic [ref=e330]: omem_user_0ee0672825776c81
+                - generic [ref=e331]: omem_project_4f10fd72627def04
+                - generic [ref=e332]: 积分模块
+                - generic [ref=e333]: 核心算法
+                - generic [ref=e334]: "+2"
+              - generic [ref=e335]:
+                - generic [ref=e336]: 4月11日 22:46
+                - generic [ref=e337]:
+                  - button "编辑" [ref=e339]:
+                    - generic [ref=e340]: 编辑
+                  - button "删除" [ref=e342]:
+                    - generic [ref=e343]: 删除
+            - generic [ref=e346] [cursor=pointer]:
+              - generic [ref=e347]:
+                - generic [ref=e348]: 偏好设置
+                - generic [ref=e349]: 外围
+                - generic [ref=e350]: 置顶
+              - paragraph [ref=e352]: 【五星重要❗】积分模块设计文档路径：/mnt/d/dev/project/nf/doc/v1/ 包含FR-001至FR-017功能规格文档，以及评审修整方案、参数表设计、积分算法说明等核心设计文档。 这是农服项目积分模块的唯一权威设计来源，所有数据库设计必须基于此目录文档。
+              - generic [ref=e353]:
+                - generic [ref=e354]: omem_user_0ee0672825776c81
+                - generic [ref=e355]: omem_project_4f10fd72627def04
+                - generic [ref=e356]: project_context
+                - generic [ref=e357]: critical_path
+                - generic [ref=e358]: "+2"
+              - generic [ref=e359]:
+                - generic [ref=e360]: 4月11日 22:43
+                - generic [ref=e361]:
+                  - button "编辑" [ref=e363]:
+                    - generic [ref=e364]: 编辑
+                  - button "删除" [ref=e366]:
+                    - generic [ref=e367]: 删除
+            - generic [ref=e370] [cursor=pointer]:
+              - generic [ref=e371]:
+                - generic [ref=e372]: 偏好设置
+                - generic [ref=e373]: 外围
+                - generic [ref=e374]: 置顶
+              - paragraph [ref=e376]: Phase 2 开发暂停，转而修复 Phase 1 遗留问题： 1. 记忆列表从表格改回卡片布局（保留 CRUD 功能） 2. 修复记忆修改不生效 bug（category/tier/memory_type 字段修改后未保存） 3. Phase 2 实施计划已写入 50%（Task 1-2 完成），待修复完成后继续
+              - generic [ref=e377]:
+                - generic [ref=e378]: omem_user_0ee0672825776c81
+                - generic [ref=e379]: omem_project_080315b6f6f84edb
+                - generic [ref=e380]: project_context
+                - generic [ref=e381]: progress
+                - generic [ref=e382]: "+1"
+              - generic [ref=e383]:
+                - generic [ref=e384]: 4月11日 21:46
+                - generic [ref=e385]:
+                  - button "编辑" [ref=e387]:
+                    - generic [ref=e388]: 编辑
+                  - button "删除" [ref=e390]:
+                    - generic [ref=e391]: 删除
+            - generic [ref=e394] [cursor=pointer]:
+              - generic [ref=e395]:
+                - generic [ref=e396]: 偏好设置
+                - generic [ref=e397]: 外围
+                - generic [ref=e398]: 置顶
+              - paragraph [ref=e400]: "【Playwright 工具名纠正 - 2026-04-11】 ## 常见错误工具名及纠正 | ❌ 错误工具名 | ✅ 正确工具名 | 用途 | |-------------|-------------|------| | playwright_browser_input_text | playwright_browser_type | 输入文本 | | playwright_browser_input | playwright_browser_type | 输入文本 | | playwright_browser_fill | playwright_browser_fill_form | 填充表单 | ## 输入文本的正确方式 ```typescript // ✅ 正确 playwright_browser_type({selector: \"#kw\", text: \"搜索内容\"}) // ❌ 错误（工具不存在） playwright_browser_input_text({selector: \"#kw\", text: \"搜索内容\"}) ``` ## 完整验证过的工具列表（从系统错误信息提取） - playwright_browser_close - playwright_browser_resize - playwright_browser_console_messages - playwright_browser_handle_dialog - playwright_browser_evaluate - playwright_browser_file_upload - playwright_browser_fill_form - playwright_browser_press_key - playwright_browser_type ⭐（输入文本用这个） - playwright_browser_navigate - playwright_browser_navigate_back - playwright_browser_network_requests - playwright_browser_run_code - playwright_browser_take_screenshot - playwright_browser_snapshot - playwright_browser_click - playwright_browser_drag - playwright_browser_hover - playwright_browser_select_option - playwright_browser_tabs - playwright_browser_wait_for **记住：输入文本用 type，不是 input_text！**123"
+              - generic [ref=e401]:
+                - generic [ref=e402]: omem_user_0ee0672825776c81
+                - generic [ref=e403]: omem_project_6377078d009b9c19
+                - generic [ref=e404]: playwright
+                - generic [ref=e405]: tool-names
+                - generic [ref=e406]: "+2"
+              - generic [ref=e407]:
+                - generic [ref=e408]: 4月11日 21:29
+                - generic [ref=e409]:
+                  - button "编辑" [ref=e411]:
+                    - generic [ref=e412]: 编辑
+                  - button "删除" [ref=e414]:
+                    - generic [ref=e415]: 删除
+            - generic [ref=e418] [cursor=pointer]:
+              - generic [ref=e419]:
+                - generic [ref=e420]: 偏好设置
+                - generic [ref=e421]: 外围
+                - generic [ref=e422]: 置顶
+              - paragraph [ref=e424]: Phase 2 开发进度： - ✅ 探虚弟子已探明现有 API 客户端模式（client.ts 拦截器、函数签名规范、类型定义位置） - 🔄 等待藏经弟子回报：omem API 统计端点文档 + ECharts Vue 3 集成方案 - 📋 下一步：根据 API 文档撰写 Phase 2 实施计划（仪表盘 + 记忆搜索）
+              - generic [ref=e425]:
+                - generic [ref=e426]: omem_user_0ee0672825776c81
+                - generic [ref=e427]: omem_project_080315b6f6f84edb
+                - generic [ref=e428]: project_context
+                - generic [ref=e429]: progress
+              - generic [ref=e430]:
+                - generic [ref=e431]: 4月11日 21:25
+                - generic [ref=e432]:
+                  - button "编辑" [ref=e434]:
+                    - generic [ref=e435]: 编辑
+                  - button "删除" [ref=e437]:
+                    - generic [ref=e438]: 删除
+          - list [ref=e440]:
+            - listitem "Previous Page" [ref=e441]:
+              - button "left" [disabled] [ref=e442]:
+                - img "left" [ref=e443]:
+                  - img [ref=e444]
+            - listitem "1" [ref=e446] [cursor=pointer]:
+              - generic [ref=e447]: "1"
+            - listitem "Next Page" [ref=e448]:
+              - button "right" [disabled] [ref=e449]:
+                - img "right" [ref=e450]:
+                  - img [ref=e451]
+            - listitem [ref=e453]:
+              - generic [ref=e454] [cursor=pointer]:
+                - generic [ref=e455]:
+                  - combobox [ref=e457]
+                  - generic [ref=e458]: 12 / page
+                - generic:
+                  - img:
+                    - img
+  - dialog "编辑记忆" [ref=e460]:
+    - document:
+      - generic [ref=e461]:
+        - button "Close" [ref=e462] [cursor=pointer]:
+          - img "close" [ref=e464]:
+            - img [ref=e465]
+        - generic [ref=e468]: 编辑记忆
+        - generic [ref=e470]:
+          - generic [ref=e472]:
+            - generic "内容" [ref=e474]: "* 内容"
+            - textbox "* 内容" [ref=e478]:
+              - /placeholder: 请输入记忆内容
+              - text: "【全局参数配置管理-FR009】 1. 参数存储：复用mall4j的tz_sys_config表(不是sys_config！)，字段：id/param_key/param_value/param_type/remark 2. 参数键前缀规范：point.kvalue.*、point.release.*、point.validity.* 3. Lambda参数独立表：param_lambda(factor_count/beta_decay)、param_lambda_factor(因子权重/算法类型) 4. 变更审计：parameter_change_log表记录所有参数变更(param_key/old_value/new_value/operator/remark) 5. 实时生效：参数修改后清除缓存，下次业务调用重新加载 6. 并发控制：Redis分布式锁(param:lock:update:{paramModule})，10秒过期 7. 事务边界：参数更新+日志写入同一事务，afterCommit清除缓存 8. 关键参数：deduct_ratio(0.8抵扣比例)、order_min(10元最低订单)、validity_days(30天消费券有效期) 9. 分配比例联动：consumer_ratio + merchant_ratio = 1.0必须校验 10. k值变更额外记录：修改k值参数时同时写入k_value_adjust_log表"
+          - generic [ref=e479]:
+            - generic [ref=e482]:
+              - generic "分类" [ref=e484]: "* 分类"
+              - generic [ref=e488] [cursor=pointer]:
+                - generic: 实体
+                - generic [ref=e489]:
+                  - combobox "* 分类" [active] [ref=e491]:
+                    - listbox:
+                      - option "偏好设置": preferences
+                      - option "实体" [selected]: entities
+                      - option "事件": events
+                  - generic "实体" [ref=e597]
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e495]:
+              - generic "层级" [ref=e497]: "* 层级"
+              - generic [ref=e501] [cursor=pointer]:
+                - generic [ref=e502]:
+                  - combobox "* 层级" [ref=e504]
+                  - generic "外围" [ref=e505]
+                - generic:
+                  - img:
+                    - img
+            - generic [ref=e508]:
+              - generic "类型" [ref=e510]: "* 类型"
+              - generic [ref=e514] [cursor=pointer]:
+                - generic [ref=e515]:
+                  - combobox "* 类型" [ref=e517]
+                  - generic "置顶" [ref=e518]
+                - generic:
+                  - img:
+                    - img
+          - generic [ref=e520]:
+            - generic "标签" [ref=e522]
+            - generic [ref=e528]:
+              - generic "omem_user_0ee0672825776c81" [ref=e530]:
+                - generic [ref=e531]: omem_user_0ee0672825776c81
+                - img [ref=e533] [cursor=pointer]:
+                  - img [ref=e534]
+              - generic "omem_project_4f10fd72627def04" [ref=e537]:
+                - generic [ref=e538]: omem_project_4f10fd72627def04
+                - img [ref=e540] [cursor=pointer]:
+                  - img [ref=e541]
+              - generic "积分模块" [ref=e544]:
+                - generic [ref=e545]: 积分模块
+                - img [ref=e547] [cursor=pointer]:
+                  - img [ref=e548]
+              - generic "参数配置" [ref=e551]:
+                - generic [ref=e552]: 参数配置
+                - img [ref=e554] [cursor=pointer]:
+                  - img [ref=e555]
+              - generic "tz_sys_config" [ref=e558]:
+                - generic [ref=e559]: tz_sys_config
+                - img [ref=e561] [cursor=pointer]:
+                  - img [ref=e562]
+              - generic "变更审计" [ref=e565]:
+                - generic [ref=e566]: 变更审计
+                - img [ref=e568] [cursor=pointer]:
+                  - img [ref=e569]
+              - combobox "标签" [ref=e573]
+        - generic [ref=e574]:
+          - button "Cancel" [ref=e575] [cursor=pointer]:
+            - generic [ref=e576]: Cancel
+          - button "OK" [ref=e577] [cursor=pointer]:
+            - generic [ref=e578]: OK
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - generic "个人资料":
+                    - generic: 个人资料
+                  - generic "偏好设置":
+                    - generic: 偏好设置
+                  - generic "实体":
+                    - generic: 实体
+                  - generic "事件":
+                    - generic: 事件
+                  - generic "案例":
+                    - generic: 案例
+                  - generic "模式":
+                    - generic: 模式

@@ -12,6 +12,11 @@ const client: AxiosInstance = axios.create({
 
 client.interceptors.request.use(
   (config) => {
+    // 如果 header 中已经手动设置了 X-API-Key（登录场景），则跳过
+    if (config.headers['X-API-Key']) {
+      return config
+    }
+    
     const authStore = useAuthStore()
     const apiKey = authStore.currentApiKey
     if (!apiKey) {

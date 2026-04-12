@@ -63,10 +63,7 @@ const handleLogin = async () => {
     // 更新 baseURL
     updateBaseURL(API_BASE_URL)
 
-    // 测试连接（使用 memoriesApi.health）
-    await memoriesApi.health()
-
-    // 获取用户信息
+    // 直接获取用户信息（同时验证 API Key）
     const profile = await profileApi.get()
 
     // 保存用户到 store
@@ -82,6 +79,7 @@ const handleLogin = async () => {
     router.push('/memories')
   } catch (error: any) {
     console.error('Login failed:', error)
+    console.error('Error details:', JSON.stringify(error, null, 2))
     message.error(error?.response?.data?.error?.message || error?.message || '登录失败，请检查 API Key')
   } finally {
     loading.value = false

@@ -1,0 +1,18 @@
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e7]: 登录 omem
+    - generic [ref=e9]:
+      - generic [ref=e11]:
+        - generic "API Key" [ref=e13]: "* API Key"
+        - generic [ref=e17]:
+          - textbox "* API Key" [ref=e18]:
+            - /placeholder: 请输入 API Key
+            - text: c60beb98-7aab-4985-8c1d-29ffd6aff75a
+          - img "eye" [ref=e20] [cursor=pointer]:
+            - img [ref=e21]
+      - button "登 录" [active] [ref=e28] [cursor=pointer]:
+        - generic [ref=e29]: 登 录
+  - generic [ref=e31]:
+    - img "close-circle" [ref=e32]:
+      - img [ref=e33]
+    - text: 登录失败，请检查 API Key

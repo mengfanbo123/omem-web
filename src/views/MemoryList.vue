@@ -150,6 +150,7 @@
                 v-model:value="formState.category"
                 :options="CATEGORY_OPTIONS"
                 placeholder="请选择分类"
+                disabled
               />
             </a-form-item>
           </a-col>
@@ -159,6 +160,7 @@
                 v-model:value="formState.tier"
                 :options="TIER_OPTIONS"
                 placeholder="请选择层级"
+                disabled
               />
             </a-form-item>
           </a-col>
@@ -168,6 +170,7 @@
                 v-model:value="formState.memory_type"
                 :options="MEMORY_TYPE_OPTIONS"
                 placeholder="请选择类型"
+                disabled
               />
             </a-form-item>
           </a-col>
@@ -312,13 +315,9 @@ const handleModalOk = async () => {
     await formRef.value?.validate()
     modalLoading.value = true
 
-    // BUG FIX: 确保所有字段都被正确包含在 payload 中
-    // 使用扩展运算符确保 undefined 字段被显式传递
+    // 后端只支持修改 content/tags/state，category/tier/memory_type 为只读字段
     const payload = {
       content: formState.content,
-      category: formState.category!,
-      tier: formState.tier!,
-      memory_type: formState.memory_type!,
       tags: formState.tags ? [...formState.tags] : []
     }
 
