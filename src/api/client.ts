@@ -60,4 +60,15 @@ export function updateBaseURL(url: string) {
   client.defaults.baseURL = url
 }
 
+export interface VersionInfo {
+  version: string
+  build_time: string
+  git_commit: string
+}
+
+export async function getVersion(): Promise<VersionInfo> {
+  const response = await client.get<VersionInfo>('/v1/version')
+  return response.data
+}
+
 export default client

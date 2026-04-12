@@ -9,6 +9,20 @@
         <span>返回</span>
       </a-button>
       <h1 class="detail-title">记忆详情</h1>
+      <a-space class="detail-actions">
+        <a-button @click="showShareModal">
+          <template #icon><ShareAltOutlined /></template>
+          Share to Space
+        </a-button>
+        <a-button @click="showPullModal">
+          <template #icon><DownloadOutlined /></template>
+          Pull from Space
+        </a-button>
+        <a-button v-if="memoryShares.length > 0" @click="showReshareModal">
+          <template #icon><RetweetOutlined /></template>
+          Reshare
+        </a-button>
+      </a-space>
     </div>
 
     <!-- 加载状态 -->
@@ -236,6 +250,75 @@
         </a-descriptions>
       </a-card>
     </div>
+
+    <!-- Share Modal -->
+    <a-modal v-model:open="shareModalVisible" title="Share to Space" @ok="handleShare">
+      <a-form :model="shareForm" layout="vertical">
+        <a-form-item label="Target Space" required>
+          <a-select v-model:value="shareForm.space_id" placeholder="Select a space">
+            <a-select-option v-for="space in spaces" :key="space.id" :value="space.id">
+              {{ space.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="Visibility" required>
+          <a-radio-group v-model:value="shareForm.visibility">
+            <a-radio value="private">Private</a-radio>
+            <a-radio value="team">Team</a-radio>
+            <a-radio value="public">Public</a-radio>
+          </a-radio-group>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- Pull Modal -->
+    <a-modal v-model:open="pullModalVisible" title="Pull from Space" @ok="handlePull">
+      <a-form :model="pullForm" layout="vertical">
+        <a-form-item label="Source Space" required>
+          <a-select v-model:value="pullForm.space_id" placeholder="Select a space" @change="loadSpaceMemories">
+            <a-select-option v-for="space in spaces" :key="space.id" :value="space.id">
+              {{ space.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="Memory" required>
+          <a-select v-model:value="pullForm.memory_id" placeholder="Select a memory">
+            <a-select-option v-for="mem in spaceMemories" :key="mem.id" :value="mem.id">
+              {{ (mem.l0_abstract || mem.content).substring(0, 50) }}...
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="Visibility" required>
+          <a-radio-group v-model:value="pullForm.visibility">
+            <a-radio value="private">Private</a-radio>
+            <a-radio value="team">Team</a-radio>
+            <a-radio value="public">Public</a-radio>
+          </a-radio-group>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- Reshare Modal -->
+    <a-modal v-model:open="reshareModalVisible" title="Reshare Memory" @ok="handleReshare">
+      <a-alert type="info" message="Current Shares" style="margin-bottom: 16px">
+        <template #description>
+          <ul>
+            <li v-for="share in memoryShares" :key="share.space_id">
+              {{ share.space_name }} ({{ share.visibility }})
+            </li>
+          </ul>
+        </template>
+      </a-alert>
+      <a-form :model="reshareForm" layout="vertical">
+        <a-form-item label="Target Space" required>
+          <a-select v-model:value="reshareForm.target_space_id" placeholder="Select a space">
+            <a-select-option v-for="space in spaces" :key="space.id" :value="space.id">
+              {{ space.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -244,6 +327,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { memoriesApi } from '@/api/memories'
+import { spacesApi } from '@/api/spaces'
 import type { Memory } from '@/types/memory'
 import type { Category, MemoryState, Tier, RelationType } from '@/types/memory'
 import {
@@ -251,6 +335,9 @@ import {
   EyeOutlined,
   StarOutlined,
   CheckCircleOutlined,
+  ShareAltOutlined,
+  DownloadOutlined,
+  RetweetOutlined,
 } from '@ant-design/icons-vue'
 import dayjs from 'dayjs'
 
@@ -261,6 +348,30 @@ const memory = ref<Memory | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const activeTab = ref('l0')
+
+// 共享相关状态
+const shareModalVisible = ref(false)
+const pullModalVisible = ref(false)
+const reshareModalVisible = ref(false)
+
+const shareForm = reactive({
+  space_id: '',
+  visibility: 'private' as 'private' | 'team' | 'public'
+})
+
+const pullForm = reactive({
+  space_id: '',
+  memory_id: '',
+  visibility: 'private' as 'private' | 'team' | 'public'
+})
+
+const reshareForm = reactive({
+  target_space_id: ''
+})
+
+const spaces = ref<any[]>([])
+const spaceMemories = ref<any[]>([])
+const memoryShares = ref<any[]>([])
 
 // 获取记忆详情
 async function fetchMemory() {
@@ -280,6 +391,116 @@ async function fetchMemory() {
     message.error('加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 加载空间列表
+async function loadSpaces() {
+  try {
+    const response = await spacesApi.list()
+    spaces.value = response.spaces
+  } catch (err) {
+    message.error('加载空间列表失败')
+  }
+}
+
+// 加载空间记忆列表
+async function loadSpaceMemories() {
+  if (!pullForm.space_id) return
+  try {
+    const response = await spacesApi.getMemories(pullForm.space_id, { limit: 100 })
+    spaceMemories.value = response.memories
+  } catch (err) {
+    message.error('加载空间记忆列表失败')
+  }
+}
+
+// 显示分享弹窗
+async function showShareModal() {
+  shareForm.space_id = ''
+  shareForm.visibility = 'private'
+  await loadSpaces()
+  shareModalVisible.value = true
+}
+
+// 显示拉取弹窗
+async function showPullModal() {
+  pullForm.space_id = ''
+  pullForm.memory_id = ''
+  pullForm.visibility = 'private'
+  spaceMemories.value = []
+  await loadSpaces()
+  pullModalVisible.value = true
+}
+
+// 显示重新分享弹窗
+async function showReshareModal() {
+  reshareForm.target_space_id = ''
+  await loadSpaces()
+  reshareModalVisible.value = true
+}
+
+// 处理分享
+async function handleShare() {
+  if (!shareForm.space_id) {
+    message.error('请选择目标空间')
+    return
+  }
+  try {
+    await spacesApi.shareMemory(shareForm.space_id, memory.value!.id, {
+      visibility: shareForm.visibility
+    })
+    message.success('分享成功')
+    shareModalVisible.value = false
+    fetchMemoryShares()
+  } catch (err: any) {
+    message.error(err?.error?.message || '分享失败')
+  }
+}
+
+// 处理拉取
+async function handlePull() {
+  if (!pullForm.space_id || !pullForm.memory_id) {
+    message.error('请选择源空间和记忆')
+    return
+  }
+  try {
+    await spacesApi.pullMemory(pullForm.space_id, {
+      memory_id: pullForm.memory_id,
+      visibility: pullForm.visibility
+    })
+    message.success('拉取成功')
+    pullModalVisible.value = false
+  } catch (err: any) {
+    message.error(err?.error?.message || '拉取失败')
+  }
+}
+
+// 处理重新分享
+async function handleReshare() {
+  if (!reshareForm.target_space_id) {
+    message.error('请选择目标空间')
+    return
+  }
+  try {
+    await spacesApi.reshareMemory(memory.value!.space_id, memory.value!.id, {
+      target_space_id: reshareForm.target_space_id
+    })
+    message.success('重新分享成功')
+    reshareModalVisible.value = false
+    fetchMemoryShares()
+  } catch (err: any) {
+    message.error(err?.error?.message || '重新分享失败')
+  }
+}
+
+// 获取记忆的共享状态
+async function fetchMemoryShares() {
+  if (!memory.value) return
+  try {
+    memoryShares.value = await spacesApi.getMemoryShares(memory.value.id)
+  } catch (err) {
+    memoryShares.value = []
   }
 }
 
@@ -384,6 +605,7 @@ function getRelationLabel(type: RelationType): string {
 
 onMounted(() => {
   fetchMemory()
+  fetchMemoryShares()
 })
 </script>
 
@@ -419,6 +641,10 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.85);
+}
+
+.detail-actions {
+  margin-left: auto;
 }
 
 .loading-state {

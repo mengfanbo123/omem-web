@@ -1,4 +1,5 @@
 import type { Category, Tier, MemoryType, MemoryState } from '@/types/memory'
+import type { SpaceType } from '@/types/space'
 
 export const CATEGORY_LABELS: Record<Category, string> = {
   profile: '个人资料',
@@ -46,3 +47,21 @@ export const STATE_OPTIONS = Object.entries(STATE_LABELS).map(([value, label]) =
   label,
   value
 }))
+
+export const SPACE_TYPE_LABELS: Record<SpaceType, string> = {
+  personal: '个人空间',
+  team: '团队空间',
+  organization: '组织空间'
+}
+
+export const SPACE_TYPE_OPTIONS = [
+  { label: '团队空间', value: 'team' },
+  { label: '组织空间', value: 'organization' }
+]
+
+export const SPACE_TYPE_FILTER_OPTIONS = [
+  { label: '全部', value: '' },
+  { label: '个人空间', value: 'personal' },
+  { label: '团队空间', value: 'team' },
+  { label: '组织空间', value: 'organization' }
+]

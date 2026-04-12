@@ -51,58 +51,82 @@
           <a-button type="primary" @click="fetchMemories">查询</a-button>
           <a-button style="margin-left: 8px" @click="resetFilters">重置</a-button>
           <a-button type="primary" style="margin-left: 8px" @click="openModal()">新增记忆</a-button>
+          <a-button
+            v-if="selectedRowKeys.length > 0"
+            type="primary"
+            style="margin-left: 8px"
+            @click="showBatchShareModal"
+          >
+            <template #icon><ShareAltOutlined /></template>
+            Batch Share ({{ selectedRowKeys.length }})
+          </a-button>
         </a-form-item>
       </a-form>
     </div>
 
-    <!-- 卡片列表 -->
-    <a-row :gutter="[16, 16]" class="card-grid">
-      <a-col v-for="record in memories" :key="record.id" :xs="24" :sm="12" :md="8" :lg="6">
-        <a-card class="memory-card" hoverable @click="viewDetail(record.id)">
-          <!-- 卡片头部：分类/层级/类型标签 -->
-          <div class="card-header">
-            <a-tag :color="getCategoryColor(record.category)" class="category-tag">
-              {{ CATEGORY_LABELS[record.category] }}
-            </a-tag>
-            <a-tag :color="getTierColor(record.tier)" class="tier-tag">
-              {{ TIER_LABELS[record.tier] }}
-            </a-tag>
-            <a-tag class="type-tag">
-              {{ MEMORY_TYPE_LABELS[record.memory_type] }}
-            </a-tag>
+    <!-- 表格列表 -->
+    <a-table
+      :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
+      :dataSource="memories"
+      :columns="columns"
+      :loading="loading"
+      :pagination="false"
+      row-key="id"
+      class="memory-table"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'category'">
+          <a-tag :color="getCategoryColor(record.category)">
+            {{ CATEGORY_LABELS[record.category] }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'tier'">
+          <a-tag :color="getTierColor(record.tier)">
+            {{ TIER_LABELS[record.tier] }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'memory_type'">
+          <a-tag>
+            {{ MEMORY_TYPE_LABELS[record.memory_type] }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'content'">
+          <div class="content-cell">
+            <span class="content-preview" @click="viewDetail(record.id)">
+              {{ record.l0_abstract || record.content }}
+            </span>
+            <a-tooltip v-if="record.shares && record.shares.length > 0">
+              <template #title>
+                Shared to: {{ record.shares.map((s: any) => s.space_name).join(', ') }}
+              </template>
+              <ShareAltOutlined style="color: #1890ff; margin-left: 8px" />
+            </a-tooltip>
           </div>
-
-          <!-- 卡片内容 -->
-          <div class="card-content">
-            <p class="content-preview">{{ record.l0_abstract || record.content }}</p>
-          </div>
-
-          <!-- 卡片标签 -->
-          <div class="card-tags" v-if="record.tags && record.tags.length > 0">
-            <a-tag v-for="tag in record.tags.slice(0, 4)" :key="tag" color="blue" class="tag-item">
-              {{ tag }}
-            </a-tag>
-            <span v-if="record.tags.length > 4" class="more-tags">+{{ record.tags.length - 4 }}</span>
-          </div>
-
-          <!-- 卡片底部 -->
-          <div class="card-footer">
-            <span class="create-time">{{ formatDate(record.created_at) }}</span>
-            <a-space class="card-actions" @click.stop>
-              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-              <a-popconfirm
-                title="确定要删除这条记忆吗？"
-                ok-text="确定"
-                cancel-text="取消"
-                @confirm="handleDelete(record.id)"
-              >
-                <a-button type="link" size="small" danger>删除</a-button>
-              </a-popconfirm>
-            </a-space>
-          </div>
-        </a-card>
-      </a-col>
-    </a-row>
+        </template>
+        <template v-else-if="column.key === 'tags'">
+          <a-tag v-for="tag in record.tags?.slice(0, 4)" :key="tag" color="blue" class="tag-item">
+            {{ tag }}
+          </a-tag>
+          <span v-if="record.tags?.length > 4" class="more-tags">+{{ record.tags.length - 4 }}</span>
+        </template>
+        <template v-else-if="column.key === 'created_at'">
+          {{ formatDate(record.created_at) }}
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <a-space @click.stop>
+            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+            <a-popconfirm
+              title="确定要删除这条记忆吗？"
+              ok-text="确定"
+              cancel-text="取消"
+              @confirm="handleDelete(record.id)"
+            >
+              <a-button type="link" size="small" danger>删除</a-button>
+            </a-popconfirm>
+          </a-space>
+        </template>
+      </template>
+    </a-table>
 
     <!-- 空状态 -->
     <a-empty v-if="!loading && memories.length === 0" description="暂无记忆" class="empty-state" />
@@ -120,6 +144,32 @@
         show-quick-jumper
       />
     </div>
+
+    <!-- 批量分享弹窗 -->
+    <a-modal
+      v-model:open="batchShareModalVisible"
+      title="Batch Share"
+      :confirm-loading="batchShareLoading"
+      @ok="handleBatchShare"
+    >
+      <a-alert type="info" :message="`Selected ${selectedRowKeys.length} memories`" style="margin-bottom: 16px" />
+      <a-form :model="batchShareForm" layout="vertical">
+        <a-form-item label="Target Space" required>
+          <a-select v-model:value="batchShareForm.space_id" placeholder="Select a space">
+            <a-select-option v-for="space in spaces" :key="space.id" :value="space.id">
+              {{ space.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="Visibility" required>
+          <a-radio-group v-model:value="batchShareForm.visibility">
+            <a-radio value="private">Private</a-radio>
+            <a-radio value="team">Team</a-radio>
+            <a-radio value="public">Public</a-radio>
+          </a-radio-group>
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
     <!-- 编辑/新增弹窗 -->
     <a-modal
@@ -194,6 +244,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import { memoriesApi } from '@/api/memories'
+import { spacesApi } from '@/api/spaces'
 import type { Memory, Category, Tier, MemoryType } from '@/types/memory'
 import {
   CATEGORY_OPTIONS,
@@ -204,11 +255,36 @@ import {
   TIER_LABELS,
   MEMORY_TYPE_LABELS
 } from '@/utils/enums'
+import { ShareAltOutlined } from '@ant-design/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
 const memories = ref<Memory[]>([])
 const formRef = ref<FormInstance>()
+
+// 批量选择相关
+const selectedRowKeys = ref<string[]>([])
+const selectedRows = ref<Memory[]>([])
+
+// 批量分享相关
+const batchShareModalVisible = ref(false)
+const batchShareLoading = ref(false)
+const spaces = ref<any[]>([])
+
+const batchShareForm = reactive({
+  space_id: '',
+  visibility: 'private' as 'private' | 'team' | 'public'
+})
+
+const columns = [
+  { title: '分类', key: 'category', width: 100 },
+  { title: '层级', key: 'tier', width: 80 },
+  { title: '类型', key: 'memory_type', width: 100 },
+  { title: '内容', key: 'content', ellipsis: true },
+  { title: '标签', key: 'tags', width: 200 },
+  { title: '创建时间', key: 'created_at', width: 150 },
+  { title: '操作', key: 'action', width: 150, fixed: 'right' }
+]
 
 const filters = reactive({
   category: undefined as Category | undefined,
@@ -244,6 +320,58 @@ const formRules = {
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
   tier: [{ required: true, message: '请选择层级', trigger: 'change' }],
   memory_type: [{ required: true, message: '请选择类型', trigger: 'change' }]
+}
+
+// 表格选择变化
+function onSelectChange(keys: string[], rows: Memory[]) {
+  selectedRowKeys.value = keys
+  selectedRows.value = rows
+}
+
+// 加载空间列表
+async function loadSpaces() {
+  try {
+    const response = await spacesApi.list()
+    spaces.value = response.spaces
+  } catch (err) {
+    message.error('加载空间列表失败')
+  }
+}
+
+// 显示批量分享弹窗
+async function showBatchShareModal() {
+  batchShareForm.space_id = ''
+  batchShareForm.visibility = 'private'
+  await loadSpaces()
+  batchShareModalVisible.value = true
+}
+
+// 处理批量分享
+async function handleBatchShare() {
+  if (!batchShareForm.space_id) {
+    message.error('请选择目标空间')
+    return
+  }
+  if (selectedRowKeys.value.length === 0) {
+    message.error('请选择要分享的记忆')
+    return
+  }
+  try {
+    batchShareLoading.value = true
+    for (const memoryId of selectedRowKeys.value) {
+      await spacesApi.shareMemory(batchShareForm.space_id, memoryId, {
+        visibility: batchShareForm.visibility
+      })
+    }
+    message.success(`成功分享 ${selectedRowKeys.value.length} 条记忆`)
+    batchShareModalVisible.value = false
+    selectedRowKeys.value = []
+    selectedRows.value = []
+  } catch (err: any) {
+    message.error(err?.error?.message || '批量分享失败')
+  } finally {
+    batchShareLoading.value = false
+  }
 }
 
 const fetchMemories = async () => {
@@ -397,6 +525,25 @@ onMounted(() => {
 
 .card-grid {
   margin-bottom: 24px;
+}
+
+.memory-table {
+  background: #fff;
+  border-radius: 8px;
+}
+
+.content-cell {
+  display: flex;
+  align-items: center;
+}
+
+.content-preview {
+  cursor: pointer;
+  color: #1890ff;
+}
+
+.content-preview:hover {
+  text-decoration: underline;
 }
 
 .memory-card {

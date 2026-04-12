@@ -8,13 +8,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "pinia": "^2.1.7",
-    "pinia-plugin-persistedstate": "^3.2.1",
+    "@antv/g6": "^5.1.0",
+    "@types/echarts": "^4.9.22",
     "ant-design-vue": "^4.2.0",
     "axios": "^1.6.8",
-    "dayjs": "^1.11.10"
+    "dayjs": "^1.11.10",
+    "echarts": "^6.0.0",
+    "echarts-wordcloud": "^2.1.0",
+    "pinia": "^2.1.7",
+    "pinia-plugin-persistedstate": "^3.2.1",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",

@@ -21,7 +21,7 @@
       theme="light"
       class="sidebar-menu"
     >
-      <a-menu-item key="dashboard" @click="navigateTo('/')">
+      <a-menu-item key="dashboard" @click="navigateTo('/dashboard')">
         <template #icon>
           <DashboardOutlined />
         </template>
@@ -35,6 +35,13 @@
         <span>记忆列表</span>
       </a-menu-item>
 
+      <a-menu-item key="search" @click="navigateTo('/search')">
+        <template #icon>
+          <SearchOutlined />
+        </template>
+        <span>记忆搜索</span>
+      </a-menu-item>
+
       <a-menu-item key="spaces" @click="navigateTo('/spaces')">
         <template #icon>
           <HomeOutlined />
@@ -44,11 +51,25 @@
 
       <a-menu-divider />
 
-      <a-menu-item key="analytics" @click="navigateTo('/analytics')">
+      <a-menu-item key="graph" @click="navigateTo('/graph')">
+        <template #icon>
+          <ApartmentOutlined />
+        </template>
+        <span>关系图谱</span>
+      </a-menu-item>
+
+      <a-menu-item key="statistics" @click="navigateTo('/statistics')">
         <template #icon>
           <BarChartOutlined />
         </template>
         <span>统计分析</span>
+      </a-menu-item>
+
+      <a-menu-item key="decay" @click="navigateTo('/decay')">
+        <template #icon>
+          <LineChartOutlined />
+        </template>
+        <span>衰减曲线</span>
       </a-menu-item>
 
       <a-menu-item key="import" @click="navigateTo('/import')">
@@ -56,6 +77,13 @@
           <UploadOutlined />
         </template>
         <span>批量导入</span>
+      </a-menu-item>
+
+      <a-menu-item key="import-history" @click="navigateTo('/import/history')">
+        <template #icon>
+          <HistoryOutlined />
+        </template>
+        <span>导入历史</span>
       </a-menu-item>
 
       <a-menu-divider />
@@ -84,10 +112,14 @@ import {
   DatabaseOutlined,
   HomeOutlined,
   BarChartOutlined,
+  LineChartOutlined,
   UploadOutlined,
+  HistoryOutlined,
   SettingOutlined,
   MenuUnfoldOutlined,
   MenuFoldOutlined,
+  SearchOutlined,
+  ApartmentOutlined,
 } from '@ant-design/icons-vue'
 
 const props = defineProps<{
@@ -106,14 +138,22 @@ const selectedKeys = ref<string[]>(['dashboard'])
 watch(
   () => route.path,
   (path) => {
-    if (path === '/') {
+    if (path.startsWith('/dashboard')) {
       selectedKeys.value = ['dashboard']
     } else if (path.startsWith('/memories')) {
       selectedKeys.value = ['memories']
+    } else if (path.startsWith('/search')) {
+      selectedKeys.value = ['search']
     } else if (path.startsWith('/spaces')) {
       selectedKeys.value = ['spaces']
-    } else if (path.startsWith('/analytics')) {
-      selectedKeys.value = ['analytics']
+    } else if (path.startsWith('/statistics')) {
+      selectedKeys.value = ['statistics']
+    } else if (path.startsWith('/graph')) {
+      selectedKeys.value = ['graph']
+    } else if (path.startsWith('/decay')) {
+      selectedKeys.value = ['decay']
+    } else if (path.startsWith('/import/history')) {
+      selectedKeys.value = ['import-history']
     } else if (path.startsWith('/import')) {
       selectedKeys.value = ['import']
     } else if (path.startsWith('/settings')) {

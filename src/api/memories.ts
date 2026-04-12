@@ -2,6 +2,32 @@ import client from './client'
 import type { Memory } from '@/types/memory'
 import type { MemoryListResponse, MemoryListParams, HealthResponse } from './types'
 
+export interface SearchParams {
+  query: string
+  space_ids?: string[]
+  categories?: string[]
+  tiers?: string[]
+  memory_types?: string[]
+  states?: string[]
+  tags?: string[]
+  created_after?: string
+  created_before?: string
+  limit?: number
+  offset?: number
+  sort_by?: 'relevance' | 'created_at' | 'updated_at'
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface SearchResult {
+  memory: Memory
+  score?: number
+}
+
+export interface SearchResponse {
+  results: SearchResult[]
+  total: number
+}
+
 export const memoriesApi = {
   // 健康检查
   async health(): Promise<HealthResponse> {
@@ -36,5 +62,11 @@ export const memoriesApi = {
   // 删除记忆
   async delete(id: string): Promise<void> {
     await client.delete(`/v1/memories/${id}`)
+  },
+
+  // 搜索记忆
+  async search(params: SearchParams): Promise<SearchResponse> {
+    const { data } = await client.post<SearchResponse>('/v1/memories/search', params)
+    return data
   },
 }
