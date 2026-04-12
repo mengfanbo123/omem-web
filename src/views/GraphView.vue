@@ -167,17 +167,17 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
-import G6 from '@antv/g6'
+import { Graph } from '@antv/g6'
 import {
   FullscreenOutlined,
   ReloadOutlined,
   DownloadOutlined,
   ExpandOutlined
 } from '@ant-design/icons-vue'
-import { getGraphData, getMemoryRelations, getMemoryOptions, type GraphData, type GraphNode, type GraphEdge, type MemoryRelations } from '@/api/graph'
+import { getGraphData, getMemoryRelations, getMemoryOptions, type GraphNode, type MemoryRelations } from '@/api/graph'
 
 const graphContainer = ref<HTMLElement | null>(null)
-let graph: G6.Graph | null = null
+let graph: Graph | null = null
 
 const graphLoading = ref(false)
 const relationsLoading = ref(false)
@@ -283,7 +283,10 @@ async function loadGraph() {
     if (filters.relationTypes.length) params.relation_types = filters.relationTypes
 
     const data = await getGraphData(params)
-    graph.data({ nodes: data.nodes, edges: data.edges })
+    graph.setData({
+      nodes: data.nodes.map(n => ({ ...n })),
+      edges: data.edges.map(e => ({ ...e }))
+    })
     graph.render()
   } catch (e: any) {
     console.error('Failed to load graph:', e)
@@ -299,7 +302,7 @@ function initGraph() {
   const width = container.clientWidth
   const height = container.clientHeight
 
-  graph = new G6.Graph({
+  graph = new Graph({
     container,
     width,
     height,
@@ -310,40 +313,18 @@ function initGraph() {
       nodeStrength: -30,
       edgeStrength: 0.1
     },
-    defaultNode: {
-      size: 40,
+    node: {
       style: {
+        size: 40,
         fill: '#5B8FF9',
         stroke: '#5B8FF9',
         lineWidth: 2
-      },
-      labelCfg: {
-        style: {
-          fill: '#000',
-          fontSize: 12
-        }
       }
     },
-    defaultEdge: {
+    edge: {
       style: {
         stroke: '#e2e2e2',
-        lineWidth: 2,
-        endArrow: {
-          path: G6.Arrow.triangle(10, 12, 0),
-          fill: '#e2e2e2'
-        }
-      }
-    },
-    modes: {
-      default: ['drag-canvas', 'zoom-canvas', 'drag-node', 'click-select']
-    },
-    nodeStateStyles: {
-      hover: {
-        cursor: 'pointer'
-      },
-      selected: {
-        stroke: '#1890ff',
-        lineWidth: 3
+        lineWidth: 2
       }
     }
   })
@@ -394,11 +375,12 @@ function resetLayout() {
 
 function exportPNG() {
   if (!graph) return
-  const dataURL = graph.toDataURL('image/png', '#ffffff')
-  const link = document.createElement('a')
-  link.download = 'graph.png'
-  link.href = dataURL
-  link.click()
+  graph.toDataURL({ type: 'image/png' }).then((dataURL: string) => {
+    const link = document.createElement('a')
+    link.download = 'graph.png'
+    link.href = dataURL
+    link.click()
+  })
 }
 
 function toggleFullscreen() {
@@ -413,7 +395,7 @@ function handleResize() {
   if (!graph || !graphContainer.value) return
   const width = graphContainer.value.clientWidth
   const height = graphContainer.value.clientHeight
-  graph.changeSize(width, height)
+  graph.resize(width, height)
 }
 
 onMounted(() => {

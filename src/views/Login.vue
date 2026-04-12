@@ -37,7 +37,6 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useAuthStore } from '@/stores/auth'
 import { profileApi } from '@/api/profile'
-import { memoriesApi } from '@/api/memories'
 import client, { updateBaseURL } from '@/api/client'
 
 const router = useRouter()

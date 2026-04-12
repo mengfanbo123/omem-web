@@ -130,14 +130,14 @@
                   <div style="margin-top: 8px">
                     <a-space>
                       <a-tag :color="getCategoryColor(item.memory.category)">
-                        {{ CATEGORY_LABELS[item.memory.category] }}
+                        {{ CATEGORY_LABELS[item.memory.category as Category] }}
                       </a-tag>
                       <a-tag :color="getTierColor(item.memory.tier)">
-                        {{ TIER_LABELS[item.memory.tier] }}
+                        {{ TIER_LABELS[item.memory.tier as Tier] }}
                       </a-tag>
-                      <a-tag>{{ MEMORY_TYPE_LABELS[item.memory.memory_type] }}</a-tag>
+                      <a-tag>{{ MEMORY_TYPE_LABELS[item.memory.memory_type as keyof typeof MEMORY_TYPE_LABELS] }}</a-tag>
                       <a-tag v-if="item.memory.state !== 'active'" :color="getStateColor(item.memory.state)">
-                        {{ STATE_LABELS[item.memory.state] }}
+                        {{ STATE_LABELS[item.memory.state as MemoryState] }}
                       </a-tag>
                       <span class="date-text">{{ formatDate(item.memory.created_at) }}</span>
                     </a-space>
@@ -246,7 +246,7 @@ import type { FormInstance } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { memoriesApi, type SearchParams, type SearchResult } from '@/api/memories'
-import type { Memory, Category, Tier, MemoryType, MemoryState } from '@/types/memory'
+import type { Memory, Category, Tier, MemoryState } from '@/types/memory'
 import {
   CATEGORY_OPTIONS,
   TIER_OPTIONS,
@@ -291,7 +291,9 @@ const filters = reactive({
   tiers: [] as string[],
   memory_types: [] as string[],
   states: [] as string[],
-  tags: [] as string[]
+  tags: [] as string[],
+  created_after: null as string | null,
+  created_before: null as string | null
 })
 
 const searchQuery = ref('')
@@ -365,8 +367,8 @@ const handleDateRangeChange = (dates: [Dayjs, Dayjs] | null) => {
     filters.created_after = dates[0].startOf('day').toISOString()
     filters.created_before = dates[1].endOf('day').toISOString()
   } else {
-    filters.created_after = undefined
-    filters.created_before = undefined
+    filters.created_after = null
+    filters.created_before = null
   }
 }
 

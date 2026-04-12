@@ -245,7 +245,7 @@ function initChart() {
     strength: p.strength,
   })) || []
 
-  const option = {
+  const option: any = {
     title: {
       text: 'Memory Decay Curve',
       left: 'center',
@@ -272,13 +272,13 @@ function initChart() {
       containLabel: true,
     },
     xAxis: {
-      type: 'category',
+      type: 'category' as const,
       name: 'Days',
       data: days,
       boundaryGap: false,
     },
     yAxis: {
-      type: 'value',
+      type: 'value' as const,
       name: 'Strength (%)',
       min: 0,
       max: 100,
@@ -319,7 +319,7 @@ function initChart() {
       {
         name: 'Current Memory',
         type: 'line',
-        data: currentCurve.length ? days.map((d, i) => currentCurve[i]?.strength ?? null) : [],
+        data: currentCurve.length ? days.map((_, i) => currentCurve[i]?.strength ?? null) : [],
         smooth: true,
         lineStyle: { width: 3 },
         itemStyle: { color: '#722ed1' },

@@ -45,7 +45,7 @@
           </template>
           <template v-else-if="column.key === 'space_type'">
             <a-tag :color="getSpaceTypeColor(record.space_type)">
-              {{ SPACE_TYPE_LABELS[record.space_type] }}
+              {{ SPACE_TYPE_LABELS[record.space_type as SpaceType] }}
             </a-tag>
           </template>
           <template v-else-if="column.key === 'member_count'">
@@ -113,7 +113,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import { spacesApi } from '@/api/spaces'
-import type { Space } from '@/types/space'
+import type { Space, SpaceType } from '@/types/space'
 import { SPACE_TYPE_LABELS, SPACE_TYPE_OPTIONS, SPACE_TYPE_FILTER_OPTIONS } from '@/utils/enums'
 
 const router = useRouter()

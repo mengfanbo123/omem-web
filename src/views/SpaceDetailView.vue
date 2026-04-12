@@ -68,7 +68,7 @@
                     <DownOutlined />
                   </a-button>
                   <template #overlay>
-                    <a-menu @click="({ key }) => handleChangeRole(record, key)">
+                    <a-menu @click="(e: any) => { if (e.key) handleChangeRole(record, e.key) }">
                       <a-menu-item key="admin">Admin</a-menu-item>
                       <a-menu-item key="member">Member</a-menu-item>
                     </a-menu>

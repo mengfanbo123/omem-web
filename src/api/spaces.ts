@@ -1,6 +1,8 @@
 import client from './client'
 import type { Space, CreateSpaceBody, UpdateSpaceBody, SpaceListResponse, SpaceListParams } from '@/types/space'
 
+export type { Space }
+
 // Space 成员相关类型
 export interface SpaceMember {
   user_id: string

@@ -1,0 +1,152 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e7]:
+        - generic [ref=e8]: 🧠
+        - generic [ref=e9]: omem
+      - menu [ref=e10]:
+        - menuitem "dashboard 仪表盘" [ref=e11] [cursor=pointer]:
+          - img "dashboard" [ref=e12]:
+            - img [ref=e13]
+          - generic [ref=e15]: 仪表盘
+        - menuitem "database 记忆列表" [ref=e16] [cursor=pointer]:
+          - img "database" [ref=e17]:
+            - img [ref=e18]
+          - generic [ref=e20]: 记忆列表
+        - menuitem "search 记忆搜索" [ref=e21] [cursor=pointer]:
+          - img "search" [ref=e22]:
+            - img [ref=e23]
+          - generic [ref=e25]: 记忆搜索
+        - menuitem "home 空间管理" [ref=e26] [cursor=pointer]:
+          - img "home" [ref=e27]:
+            - img [ref=e28]
+          - generic [ref=e30]: 空间管理
+        - listitem [ref=e31]
+        - menuitem "apartment 关系图谱" [ref=e32] [cursor=pointer]:
+          - img "apartment" [ref=e33]:
+            - img [ref=e34]
+          - generic [ref=e36]: 关系图谱
+        - menuitem "bar-chart 统计分析" [ref=e37] [cursor=pointer]:
+          - img "bar-chart" [ref=e38]:
+            - img [ref=e39]
+          - generic [ref=e41]: 统计分析
+        - menuitem "line-chart 衰减曲线" [ref=e42] [cursor=pointer]:
+          - img "line-chart" [ref=e43]:
+            - img [ref=e44]
+          - generic [ref=e46]: 衰减曲线
+        - menuitem "upload 批量导入" [ref=e47] [cursor=pointer]:
+          - img "upload" [ref=e48]:
+            - img [ref=e49]
+          - generic [ref=e51]: 批量导入
+        - menuitem "history 导入历史" [ref=e52] [cursor=pointer]:
+          - img "history" [ref=e53]:
+            - img [ref=e54]
+          - generic [ref=e56]: 导入历史
+        - listitem [ref=e57]
+        - menuitem "setting 系统设置" [ref=e58] [cursor=pointer]:
+          - img "setting" [ref=e59]:
+            - img [ref=e60]
+          - generic [ref=e62]: 系统设置
+      - generic [ref=e63] [cursor=pointer]:
+        - img "menu-fold" [ref=e64]:
+          - img [ref=e65]
+        - generic [ref=e67]: 收起
+  - generic [ref=e68]:
+    - generic [ref=e69]:
+      - img "menu-fold" [ref=e71] [cursor=pointer]:
+        - img [ref=e72]
+      - generic [ref=e76]:
+        - generic [ref=e77]:
+          - img "search" [ref=e79]:
+            - img [ref=e80]
+          - textbox "搜索记忆..." [ref=e82]
+        - button "search" [ref=e84] [cursor=pointer]:
+          - img "search" [ref=e85]:
+            - img [ref=e86]
+      - generic [ref=e88]:
+        - generic [ref=e89] [cursor=pointer]:
+          - generic [ref=e91]: U
+          - generic [ref=e92]: Unknown User
+          - img "down" [ref=e93]:
+            - img [ref=e94]
+        - separator [ref=e96]
+        - button "logout 退出" [ref=e97] [cursor=pointer]:
+          - img "logout" [ref=e98]:
+            - img [ref=e99]
+          - generic [ref=e101]: 退出
+    - main [ref=e102]:
+      - generic [ref=e103]:
+        - generic [ref=e105]:
+          - generic [ref=e107]:
+            - generic "分类" [ref=e109]: "分类 :"
+            - generic [ref=e113] [cursor=pointer]:
+              - generic [ref=e114]:
+                - combobox [ref=e116]
+                - generic: 全部
+              - generic:
+                - img:
+                  - img
+          - generic [ref=e118]:
+            - generic "层级" [ref=e120]: "层级 :"
+            - generic [ref=e124] [cursor=pointer]:
+              - generic [ref=e125]:
+                - combobox [ref=e127]
+                - generic: 全部
+              - generic:
+                - img:
+                  - img
+          - generic [ref=e129]:
+            - generic "类型" [ref=e131]: "类型 :"
+            - generic [ref=e135] [cursor=pointer]:
+              - generic [ref=e136]:
+                - combobox [ref=e138]
+                - generic: 全部
+              - generic:
+                - img:
+                  - img
+          - generic [ref=e140]:
+            - generic "状态" [ref=e142]: "状态 :"
+            - generic [ref=e146] [cursor=pointer]:
+              - generic [ref=e147]:
+                - combobox [ref=e149]
+                - generic: 全部
+              - generic:
+                - img:
+                  - img
+          - generic [ref=e151]:
+            - generic "标签" [ref=e153]: "标签 :"
+            - textbox "输入标签" [ref=e158]
+          - generic [ref=e164]:
+            - button "查 询" [ref=e165] [cursor=pointer]:
+              - generic [ref=e166]: 查 询
+            - button "重 置" [ref=e167] [cursor=pointer]:
+              - generic [ref=e168]: 重 置
+            - button "新增记忆" [ref=e169] [cursor=pointer]:
+              - generic [ref=e170]: 新增记忆
+        - generic [ref=e172]:
+          - generic:
+            - generic:
+              - generic:
+                - generic:
+                  - table:
+                    - rowgroup:
+                      - row "Select all 分类 层级 类型 内容 标签 创建时间 操作":
+                        - columnheader "Select all":
+                          - generic:
+                            - generic:
+                              - generic:
+                                - checkbox "Select all" [disabled]
+                        - columnheader "分类"
+                        - columnheader "层级"
+                        - columnheader "类型"
+                        - columnheader "内容"
+                        - columnheader "标签"
+                        - columnheader "创建时间"
+                        - columnheader "操作"
+                    - rowgroup:
+                      - row "No data":
+                        - cell "No data":
+                          - generic:
+                            - generic:
+                              - img
+                            - paragraph: No data

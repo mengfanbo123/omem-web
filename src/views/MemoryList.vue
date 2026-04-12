@@ -64,69 +64,78 @@
       </a-form>
     </div>
 
-    <!-- 表格列表 -->
-    <a-table
-      :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
-      :dataSource="memories"
-      :columns="columns"
-      :loading="loading"
-      :pagination="false"
-      row-key="id"
-      class="memory-table"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'category'">
-          <a-tag :color="getCategoryColor(record.category)">
-            {{ CATEGORY_LABELS[record.category] }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'tier'">
-          <a-tag :color="getTierColor(record.tier)">
-            {{ TIER_LABELS[record.tier] }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'memory_type'">
-          <a-tag>
-            {{ MEMORY_TYPE_LABELS[record.memory_type] }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'content'">
-          <div class="content-cell">
-            <span class="content-preview" @click="viewDetail(record.id)">
+    <!-- 卡片列表 -->
+    <a-row :gutter="[16, 16]" class="card-grid" v-if="memories.length > 0">
+      <a-col
+        v-for="record in memories"
+        :key="record.id"
+        :xs="24"
+        :sm="12"
+        :md="8"
+        :lg="6"
+        :xl="4"
+      >
+        <a-card class="memory-card" :bodyStyle="{ padding: '16px', height: '100%', display: 'flex', flexDirection: 'column' }">
+          <!-- 卡片头部：复选框 + 标签 -->
+          <div class="card-header">
+            <a-checkbox
+              :checked="selectedRowKeys.includes(record.id)"
+              @change="(e: any) => onCardSelect(record, e.target.checked)"
+              @click.stop
+            />
+            <a-tag :color="getCategoryColor(record.category)">
+              {{ CATEGORY_LABELS[record.category] }}
+            </a-tag>
+            <a-tag :color="getTierColor(record.tier)">
+              {{ TIER_LABELS[record.tier] }}
+            </a-tag>
+            <a-tag>
+              {{ MEMORY_TYPE_LABELS[record.memory_type] }}
+            </a-tag>
+          </div>
+
+          <!-- 卡片内容 -->
+          <div class="card-content" @click="viewDetail(record.id)">
+            <div class="content-preview">
               {{ record.l0_abstract || record.content }}
-            </span>
-            <a-tooltip v-if="record.shares && record.shares.length > 0">
+            </div>
+            <a-tooltip v-if="(record as any).shares && (record as any).shares.length > 0">
               <template #title>
-                Shared to: {{ record.shares.map((s: any) => s.space_name).join(', ') }}
+                Shared to: {{ (record as any).shares.map((s: any) => s.space_name).join(', ') }}
               </template>
               <ShareAltOutlined style="color: #1890ff; margin-left: 8px" />
             </a-tooltip>
           </div>
-        </template>
-        <template v-else-if="column.key === 'tags'">
-          <a-tag v-for="tag in record.tags?.slice(0, 4)" :key="tag" color="blue" class="tag-item">
-            {{ tag }}
-          </a-tag>
-          <span v-if="record.tags?.length > 4" class="more-tags">+{{ record.tags.length - 4 }}</span>
-        </template>
-        <template v-else-if="column.key === 'created_at'">
-          {{ formatDate(record.created_at) }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space @click.stop>
-            <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
-            <a-popconfirm
-              title="确定要删除这条记忆吗？"
-              ok-text="确定"
-              cancel-text="取消"
-              @confirm="handleDelete(record.id)"
-            >
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </template>
-    </a-table>
+
+          <!-- 标签列表 -->
+          <div class="card-tags" v-if="record.tags && record.tags.length > 0">
+            <a-tag v-for="tag in record.tags?.slice(0, 4)" :key="tag" color="blue" class="tag-item">
+              {{ tag }}
+            </a-tag>
+            <span v-if="record.tags?.length > 4" class="more-tags">+{{ record.tags.length - 4 }}</span>
+          </div>
+
+          <!-- 卡片底部 -->
+          <div class="card-footer">
+            <span class="create-time">{{ formatDate(record.created_at) }}</span>
+            <a-space @click.stop>
+              <a-button type="link" size="small" @click="openModal(record)">编辑</a-button>
+              <a-popconfirm
+                title="确定要删除这条记忆吗？"
+                ok-text="确定"
+                cancel-text="取消"
+                @confirm="handleDelete(record.id)"
+              >
+                <a-button type="link" size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </a-space>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <!-- 加载状态 -->
+    <a-spin v-if="loading" style="display: flex; justify-content: center; padding: 60px 0" />
 
     <!-- 空状态 -->
     <a-empty v-if="!loading && memories.length === 0" description="暂无记忆" class="empty-state" />
@@ -276,16 +285,6 @@ const batchShareForm = reactive({
   visibility: 'private' as 'private' | 'team' | 'public'
 })
 
-const columns = [
-  { title: '分类', key: 'category', width: 100 },
-  { title: '层级', key: 'tier', width: 80 },
-  { title: '类型', key: 'memory_type', width: 100 },
-  { title: '内容', key: 'content', ellipsis: true },
-  { title: '标签', key: 'tags', width: 200 },
-  { title: '创建时间', key: 'created_at', width: 150 },
-  { title: '操作', key: 'action', width: 150, fixed: 'right' }
-]
-
 const filters = reactive({
   category: undefined as Category | undefined,
   tier: undefined as Tier | undefined,
@@ -322,10 +321,18 @@ const formRules = {
   memory_type: [{ required: true, message: '请选择类型', trigger: 'change' }]
 }
 
-// 表格选择变化
-function onSelectChange(keys: string[], rows: Memory[]) {
-  selectedRowKeys.value = keys
-  selectedRows.value = rows
+// 卡片复选框选择
+function onCardSelect(record: Memory, e: { target: { checked: boolean } }) {
+  const checked = e.target.checked
+  if (checked) {
+    if (!selectedRowKeys.value.includes(record.id)) {
+      selectedRowKeys.value = [...selectedRowKeys.value, record.id]
+      selectedRows.value = [...selectedRows.value, record]
+    }
+  } else {
+    selectedRowKeys.value = selectedRowKeys.value.filter(k => k !== record.id)
+    selectedRows.value = selectedRows.value.filter(r => r.id !== record.id)
+  }
 }
 
 // 加载空间列表
@@ -389,7 +396,7 @@ const fetchMemories = async () => {
 
     const response = await memoriesApi.list(params)
     memories.value = response.memories
-    pagination.total = response.total
+    pagination.total = response.total_count
   } catch (error: any) {
     message.error(error?.error?.message || '获取记忆列表失败')
   } finally {
@@ -413,7 +420,7 @@ const handlePageChange = (page: number, pageSize: number) => {
   fetchMemories()
 }
 
-const handleSizeChange = (current: number, size: number) => {
+const handleSizeChange = (_current: number, size: number) => {
   pagination.pageSize = size
   pagination.current = 1
   fetchMemories()

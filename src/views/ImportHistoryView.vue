@@ -137,7 +137,7 @@
         :dataSource="currentDetail.errors"
         :columns="errorColumns"
         :pagination="{ pageSize: 5 }"
-        :row-key="(record: ImportError, index: number) => index"
+        :row-key="(_record: ImportError, index: number) => index"
         size="small"
       >
         <template #bodyCell="{ column, record }">
@@ -156,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
@@ -169,15 +169,15 @@ const detailVisible = ref(false)
 const currentDetail = ref<ImportHistoryDetail | null>(null)
 
 const filters = reactive({
-  dateRange: [] as [Dayjs, Dayjs] | null,
+  dateRange: null as [Dayjs, Dayjs] | null,
   status: 'all' as 'all' | 'success' | 'partial' | 'failed'
 })
 
 const stats = ref([
-  { title: '总导入次数', value: 0, suffix: '次' },
-  { title: '总记录数', value: 0, suffix: '条' },
-  { title: '总成功数', value: 0, suffix: '条' },
-  { title: '平均成功率', value: 0, suffix: '%' }
+  { title: '总导入次数', value: 0, suffix: '次', prefix: null },
+  { title: '总记录数', value: 0, suffix: '条', prefix: null },
+  { title: '总成功数', value: 0, suffix: '条', prefix: null },
+  { title: '平均成功率', value: 0, suffix: '%', prefix: null }
 ])
 
 const columns = [
@@ -229,10 +229,10 @@ const loadStats = async () => {
   try {
     const data = await importApi.getStats()
     stats.value = [
-      { title: '总导入次数', value: data.total_imports, suffix: '次' },
-      { title: '总记录数', value: data.total_records, suffix: '条' },
-      { title: '总成功数', value: data.total_success, suffix: '条' },
-      { title: '平均成功率', value: Math.round(data.avg_success_rate * 100) / 100, suffix: '%' }
+      { title: '总导入次数', value: data.total_imports, suffix: '次', prefix: null },
+      { title: '总记录数', value: data.total_records, suffix: '条', prefix: null },
+      { title: '总成功数', value: data.total_success, suffix: '条', prefix: null },
+      { title: '平均成功率', value: Math.round(data.avg_success_rate * 100) / 100, suffix: '%', prefix: null }
     ]
   } catch (e: any) {
     console.error('Failed to load stats:', e)
