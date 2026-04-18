@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import apiClient from "@/api/client"
-import { ArrowLeft, Save, Plus } from "lucide-react"
+import { ArrowLeft, Save, Plus, Lock } from "lucide-react"
+import { useVaultStore } from "@/stores/vault"
+import { isPrivateMemory, getTagClassName } from "@/lib/tag-utils"
 
 interface MemoryFormData {
   content: string
@@ -50,6 +52,8 @@ export function MemoryFormPage() {
   const [loading, setLoading] = useState(isEditing)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isPrivate, setIsPrivate] = useState(false)
+  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
 
   useEffect(() => {
     if (!isEditing) return
@@ -64,6 +68,7 @@ export function MemoryFormPage() {
           source: response.source || "",
         })
         setTagInput(formatTags(response.tags || []))
+        setIsPrivate(isPrivateMemory(response.tags))
       } catch (err) {
         console.error("Failed to fetch memory:", err)
         setError("加载记忆失败")
@@ -149,6 +154,27 @@ export function MemoryFormPage() {
     )
   }
 
+  if (isEditing && isPrivate && !vaultUnlocked) {
+    return (
+      <div className="space-y-6 max-w-2xl">
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="size-4 mr-1.5" />
+          返回
+        </Button>
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-8 text-center space-y-4">
+          <Lock className="h-10 w-10 text-amber-500 mx-auto" />
+          <h3 className="text-lg font-semibold text-amber-500">Vault 已锁定</h3>
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+            此记忆为私密记忆，请先解锁 Vault 后再进行编辑
+          </p>
+          <Button size="sm" onClick={() => navigate(`/memories/${id}`)}>
+            返回详情页
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
@@ -198,8 +224,8 @@ export function MemoryFormPage() {
               {formData.tags.map((tag) => (
                 <Badge
                   key={tag}
-                  variant="secondary"
-                  className="cursor-pointer hover:bg-destructive/20"
+                  variant="outline"
+                  className={getTagClassName(tag, "cursor-pointer hover:opacity-60")}
                   onClick={() => removeTag(tag)}
                   title="点击移除"
                 >

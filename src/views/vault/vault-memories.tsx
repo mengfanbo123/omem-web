@@ -16,14 +16,25 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import apiClient from "@/api/client"
-import { Search, ChevronLeft, ChevronRight, Lock, Unlock, Plus, Trash2, SlidersHorizontal, ArrowUpDown } from "lucide-react"
+import {
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Lock,
+  Unlock,
+  Trash2,
+  SlidersHorizontal,
+  ArrowUpDown,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useVaultStore } from "@/stores/vault"
 import {
   isPrivateMemory,
   getTagClassName,
   getTierLabel,
   getTierVariant,
 } from "@/lib/tag-utils"
+import { formatContent, formatDate } from "@/views/memories/memory-list"
 
 interface MemoryItem {
   id: string
@@ -53,111 +64,126 @@ interface MemoriesResponse {
 
 const SEARCH_DEBOUNCE_MS = 300
 
-export function formatContent(content: string | undefined, maxLength: number = 120) {
-  if (!content) return "—"
-  if (content.length <= maxLength) return content
-  return content.slice(0, maxLength) + "..."
-}
+function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const isFirstTime = !useVaultStore.getState().passwordHash
+  const setVaultPassword = useVaultStore((s) => s.setPassword)
+  const verifyPassword = useVaultStore((s) => s.verifyPassword)
 
-export function formatDate(dateString: string) {
-  const date = new Date(dateString)
-  return date.toLocaleString("zh-CN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-function PrivateContent({ memory, unlocked }: { memory: MemoryItem; unlocked: boolean }) {
-  if (!isPrivateMemory(memory.tags)) {
-    return (
-      <p className="text-sm text-foreground line-clamp-3">
-        {formatContent(memory.content || memory.l0_abstract)}
-      </p>
-    )
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Lock className="h-3.5 w-3.5 text-amber-500" />
-        <span>🔒 私密记忆 · 已加密</span>
-      </div>
-    )
+  const handleSubmit = async () => {
+    if (!password.trim()) {
+      setError("请输入密码")
+      return
+    }
+    if (isFirstTime) {
+      await setVaultPassword(password)
+      onUnlock()
+    } else if (await verifyPassword(password)) {
+      setError(null)
+      onUnlock()
+    } else {
+      setError("密码错误")
+    }
   }
 
   return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-1.5">
-        <Unlock className="h-3 w-3 text-amber-500" />
-        <span className="text-xs text-amber-500 font-medium">已解锁</span>
-      </div>
-      <p className="text-sm text-foreground line-clamp-3">
-        {formatContent(memory.content || memory.l0_abstract)}
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-8 text-center space-y-4 max-w-md mx-auto mt-12">
+      <Lock className="h-10 w-10 text-amber-500 mx-auto" />
+      <h3 className="text-lg font-semibold text-amber-500">
+        {isFirstTime ? "设置 Vault 密码" : "Vault 已锁定"}
+      </h3>
+      <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+        {isFirstTime
+          ? "首次查看私密记忆，请设置 Vault 密码"
+          : "私密记忆已加密，请输入 Vault 密码查看"}
       </p>
+      <div className="flex items-center gap-2 max-w-xs mx-auto">
+        <Input
+          type="password"
+          placeholder={isFirstTime ? "设置密码..." : "输入密码..."}
+          value={password}
+          onChange={(e) => {
+            setPassword(e.target.value)
+            setError(null)
+          }}
+          onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
+          className={error ? "border-destructive" : ""}
+        />
+        <Button size="sm" onClick={handleSubmit}>
+          {isFirstTime ? "设置" : "解锁"}
+        </Button>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }
 
-export function MemoryListPage() {
+export function VaultMemoriesPage() {
   const navigate = useNavigate()
+  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
+  const vaultLock = useVaultStore((s) => s.lock)
+  const [localUnlocked, setLocalUnlocked] = useState(false)
+
   const [memories, setMemories] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [totalCount, setTotalCount] = useState(0)
-  const [vaultUnlocked, setVaultUnlocked] = useState(false)
-  const [showVaultInput, setShowVaultInput] = useState(false)
-  const [vaultPassword, setVaultPassword] = useState("")
-  const [vaultError, setVaultError] = useState<string | null>(null)
   const [tierFilter, setTierFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("created_at")
-  const [pageSize, setPageSize] = useState<number>(20)
+  const [pageSize, setPageSize] = useState<number>(50)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [privacyFilter, setPrivacyFilter] = useState<'all' | 'public' | 'private'>("public")
 
-  const fetchMemories = useCallback(async (pageNum: number, query: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-      const offset = (pageNum - 1) * pageSize
-      const params: Record<string, string | number | undefined> = {
-        offset,
-        limit: pageSize,
-        search: query || undefined,
-        sort: sortBy,
+  const isUnlocked = vaultUnlocked || localUnlocked
+
+  const fetchMemories = useCallback(
+    async (pageNum: number, query: string) => {
+      try {
+        setLoading(true)
+        setError(null)
+        const offset = (pageNum - 1) * pageSize
+        const params: Record<string, string | number | undefined> = {
+          offset,
+          limit: pageSize,
+          search: query || undefined,
+          sort: sortBy,
+        }
+        if (tierFilter !== "all") {
+          params.tier = tierFilter
+        }
+        const response = await apiClient.get<MemoriesResponse>("/v1/memories", {
+          params,
+        })
+        setMemories(response.memories || [])
+        setTotalCount(response.total_count || 0)
+      } catch (err) {
+        console.error("Failed to fetch memories:", err)
+        setError("加载记忆列表失败")
+      } finally {
+        setLoading(false)
       }
-      if (tierFilter !== "all") {
-        params.tier = tierFilter
-      }
-      const response = await apiClient.get<MemoriesResponse>("/v1/memories", {
-        params,
-      })
-      setMemories(response.memories || [])
-      setTotalCount(response.total_count || 0)
-    } catch (err) {
-      console.error("Failed to fetch memories:", err)
-      setError("加载记忆列表失败")
-    } finally {
-      setLoading(false)
-    }
-  }, [tierFilter, sortBy, pageSize])
+    },
+    [tierFilter, sortBy, pageSize]
+  )
 
   useEffect(() => {
+    if (!isUnlocked) return
     const timer = setTimeout(() => {
       setPage(1)
       fetchMemories(1, searchQuery)
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [searchQuery, fetchMemories])
+  }, [searchQuery, fetchMemories, isUnlocked])
 
   useEffect(() => {
+    if (!isUnlocked) return
     fetchMemories(page, searchQuery)
-  }, [page, searchQuery, fetchMemories])
+  }, [page, searchQuery, fetchMemories, isUnlocked])
+
+  const privateMemories = memories.filter((m) => isPrivateMemory(m.tags))
 
   const handleRowClick = (id: string) => {
     navigate(`/memories/${id}`)
@@ -173,21 +199,6 @@ export function MemoryListPage() {
 
   const handleNextPage = () => {
     if (page * pageSize < totalCount) setPage(page + 1)
-  }
-
-  const handleVaultUnlock = () => {
-    if (!vaultPassword.trim()) {
-      setVaultError("请输入密码")
-      return
-    }
-    setVaultError(null)
-    setVaultUnlocked(true)
-    setShowVaultInput(false)
-    setVaultPassword("")
-  }
-
-  const handleVaultLock = () => {
-    setVaultUnlocked(false)
   }
 
   const handleDeleteClick = (id: string, e: React.MouseEvent) => {
@@ -208,7 +219,9 @@ export function MemoryListPage() {
       toast.success("记忆已删除")
       setDeleteTarget(null)
 
-      const remainingCount = previousMemories.filter((m) => m.id !== targetId).length
+      const remainingCount = previousMemories.filter(
+        (m) => m.id !== targetId
+      ).length
       if (remainingCount === 0 && page > 1) {
         setPage(page - 1)
         fetchMemories(page - 1, searchQuery)
@@ -227,15 +240,40 @@ export function MemoryListPage() {
 
   const hasNext = page * pageSize < totalCount
   const hasPrev = page > 1
-  const privateCount = memories.filter((m) => isPrivateMemory(m.tags)).length
+
+  if (!isUnlocked) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Lock className="size-6 text-amber-500" />
+            私密记忆
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            管理您的私密记忆内容
+          </p>
+        </div>
+        <VaultUnlock onUnlock={() => setLocalUnlocked(true)} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">记忆列表</h1>
-        <p className="text-sm text-muted-foreground">
-          浏览和管理您的所有记忆
-        </p>
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
+            <Lock className="size-6 text-amber-500" />
+            私密记忆
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            管理您的私密记忆内容
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => vaultLock()}>
+          <Lock className="size-3.5 mr-1.5" />
+          锁定 Vault
+        </Button>
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
@@ -243,7 +281,7 @@ export function MemoryListPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="搜索记忆内容..."
+            placeholder="搜索私密记忆内容..."
             value={searchQuery}
             onChange={handleSearchChange}
             className="pl-9"
@@ -254,7 +292,10 @@ export function MemoryListPage() {
           <SlidersHorizontal className="size-3.5 text-muted-foreground" />
           <select
             value={tierFilter}
-            onChange={(e) => { setTierFilter(e.target.value); setPage(1) }}
+            onChange={(e) => {
+              setTierFilter(e.target.value)
+              setPage(1)
+            }}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">全部分类</option>
@@ -266,7 +307,10 @@ export function MemoryListPage() {
           <ArrowUpDown className="size-3.5 text-muted-foreground" />
           <select
             value={sortBy}
-            onChange={(e) => { setSortBy(e.target.value); setPage(1) }}
+            onChange={(e) => {
+              setSortBy(e.target.value)
+              setPage(1)
+            }}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="created_at">按时间</option>
@@ -277,71 +321,18 @@ export function MemoryListPage() {
 
           <select
             value={pageSize}
-            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value))
+              setPage(1)
+            }}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value={20}>20条/页</option>
             <option value={50}>50条/页</option>
             <option value={100}>100条/页</option>
           </select>
-
-          <Lock className="size-3.5 text-muted-foreground" />
-          <select
-            value={privacyFilter}
-            onChange={(e) => { setPrivacyFilter(e.target.value as 'all' | 'public' | 'private'); setPage(1) }}
-            className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="all">全部记忆</option>
-            <option value="public">普通记忆</option>
-            <option value="private">私密记忆</option>
-          </select>
         </div>
-
-        <Button size="sm" onClick={() => navigate("/memories/new")}>
-          <Plus className="size-3.5 mr-1.5" />
-          新建
-        </Button>
-
-        {vaultUnlocked ? (
-          <Button variant="outline" size="sm" onClick={handleVaultLock}>
-            <Lock className="size-3.5 mr-1.5" />
-            锁定 Vault
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowVaultInput(!showVaultInput)}
-          >
-            <Unlock className="size-3.5 mr-1.5" />
-            解锁 Vault
-          </Button>
-        )}
       </div>
-
-      {showVaultInput && (
-        <div className="space-y-2 max-w-md">
-          <div className="flex items-center gap-2">
-            <Input
-              type="password"
-              placeholder="输入 Vault 密码..."
-              value={vaultPassword}
-              onChange={(e) => {
-                setVaultPassword(e.target.value)
-                setVaultError(null)
-              }}
-              onKeyDown={(e) => e.key === "Enter" && handleVaultUnlock()}
-              className={vaultError ? "border-destructive flex-1" : "flex-1"}
-            />
-            <Button size="sm" onClick={handleVaultUnlock}>
-              解锁
-            </Button>
-          </div>
-          {vaultError && (
-            <p className="text-xs text-destructive">{vaultError}</p>
-          )}
-        </div>
-      )}
 
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
@@ -364,35 +355,32 @@ export function MemoryListPage() {
               </div>
             </div>
           ))
+        ) : privateMemories.length === 0 ? (
+          <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+            暂无私密记忆
+          </div>
         ) : (
-          (() => {
-            const filteredMemories = memories.filter((m) =>
-              privacyFilter === 'all'
-                ? true
-                : privacyFilter === 'private'
-                  ? isPrivateMemory(m.tags)
-                  : !isPrivateMemory(m.tags)
-            )
-            if (filteredMemories.length === 0) {
-              return (
-                <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
-                  {searchQuery || privacyFilter !== 'all' ? "未找到匹配的记忆" : "暂无记忆数据"}
-                </div>
-              )
-            }
-            return filteredMemories.map((memory) => (
+          privateMemories.map((memory) => (
             <button
               type="button"
               key={memory.id}
               onClick={() => handleRowClick(memory.id)}
               className={cn(
                 "w-full text-left rounded-lg border p-4 cursor-pointer transition-colors",
-                isPrivateMemory(memory.tags)
-                  ? "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"
-                  : "border-border bg-card hover:bg-muted/50"
+                "border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10"
               )}
             >
-              <PrivateContent memory={memory} unlocked={vaultUnlocked} />
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <Unlock className="h-3 w-3 text-amber-500" />
+                  <span className="text-xs text-amber-500 font-medium">
+                    已解锁
+                  </span>
+                </div>
+                <p className="text-sm text-foreground line-clamp-3">
+                  {formatContent(memory.content || memory.l0_abstract)}
+                </p>
+              </div>
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 <Badge variant="outline" className="font-normal text-xs">
                   {memory.category || "未分类"}
@@ -400,15 +388,13 @@ export function MemoryListPage() {
                 <Badge variant={getTierVariant(memory.tier)} className="text-xs">
                   {getTierLabel(memory.tier)}
                 </Badge>
-                {isPrivateMemory(memory.tags) && (
-                  <Badge
-                    variant="outline"
-                    className={getTagClassName("私密", "text-xs")}
-                  >
-                    <Lock className="size-2.5 mr-1" />
-                    私密
-                  </Badge>
-                )}
+                <Badge
+                  variant="outline"
+                  className={getTagClassName("私密", "text-xs")}
+                >
+                  <Lock className="size-2.5 mr-1" />
+                  私密
+                </Badge>
                 <span className="text-xs text-muted-foreground ml-auto">
                   {formatDate(memory.created_at)}
                 </span>
@@ -423,19 +409,13 @@ export function MemoryListPage() {
               </div>
             </button>
           ))
-          })()
         )}
       </div>
 
       {!loading && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            共 {totalCount} 条记忆
-            {privateCount > 0 && (
-              <span className="ml-2 text-amber-500">
-                · {privateCount} 条私密
-              </span>
-            )}
+            共 {privateMemories.length} 条私密记忆
           </p>
           <div className="flex items-center gap-2">
             <Button
@@ -460,7 +440,12 @@ export function MemoryListPage() {
         </div>
       )}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null) }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setDeleteTarget(null)
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除记忆</AlertDialogTitle>
@@ -469,8 +454,17 @@ export function MemoryListPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)} disabled={isDeleting}>取消</AlertDialogCancel>
-            <AlertDialogAction disabled={isDeleting} onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel
+              onClick={() => setDeleteTarget(null)}
+              disabled={isDeleting}
+            >
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               {isDeleting ? "删除中..." : "删除"}
             </AlertDialogAction>
           </AlertDialogFooter>

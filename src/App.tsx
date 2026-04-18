@@ -5,10 +5,12 @@ import { DashboardPage } from '@/views/dashboard/dashboard'
 import { MemoryListPage } from '@/views/memories/memory-list'
 import { MemoryDetailPage } from '@/views/memories/memory-detail'
 import { MemoryFormPage } from '@/views/memories/memory-form'
+import { VaultMemoriesPage } from '@/views/vault/vault-memories'
 import { SpacesPage } from '@/views/spaces/spaces'
 import { AnalyticsPage } from '@/views/analytics/analytics'
 import { ImportPage } from '@/views/import/import-page'
 import { SettingsPage } from '@/views/settings/settings-page'
+import { ProfilePage } from '@/views/profile/profile-page'
 import { NotFoundPage } from '@/views/error/not-found'
 import { ErrorBoundary } from '@/components/error-boundary'
 import { useAuthStore } from '@/stores/auth'
@@ -38,9 +40,11 @@ function App() {
           <Route path="memories/:id" element={<MemoryDetailPage />} />
           <Route path="memories/new" element={<MemoryFormPage />} />
           <Route path="memories/:id/edit" element={<MemoryFormPage />} />
+          <Route path="vault" element={<VaultMemoriesPage />} />
           <Route path="spaces" element={<SpacesPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="import" element={<ImportPage />} />
+          <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>

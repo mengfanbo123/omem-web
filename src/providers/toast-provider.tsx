@@ -1,54 +1,35 @@
-import { createContext, useContext, useCallback } from "react"
-import { toast as sonnerToast } from "sonner"
+import { Toaster } from "sonner"
 
-type ToastType = "success" | "error" | "info" | "warning"
-
-interface ToastContextValue {
-  toast: (message: string, type?: ToastType) => void
-  success: (message: string) => void
-  error: (message: string) => void
-  info: (message: string) => void
-  warning: (message: string) => void
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null)
-
+/**
+ * ToastProvider - 已简化为直接渲染 Sonner Toaster
+ * 全站统一使用：import { toast } from "sonner"
+ * 不再提供自定义 useToast hook
+ */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const toast = useCallback((message: string, type: ToastType = "info") => {
-    switch (type) {
-      case "success":
-        sonnerToast.success(message)
-        break
-      case "error":
-        sonnerToast.error(message)
-        break
-      case "warning":
-        sonnerToast.warning(message)
-        break
-      default:
-        sonnerToast(message)
-    }
-  }, [])
-
-  const value: ToastContextValue = {
-    toast,
-    success: (msg) => toast(msg, "success"),
-    error: (msg) => toast(msg, "error"),
-    info: (msg) => toast(msg, "info"),
-    warning: (msg) => toast(msg, "warning"),
-  }
-
   return (
-    <ToastContext.Provider value={value}>
+    <>
       {children}
-    </ToastContext.Provider>
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+      />
+    </>
   )
 }
 
+/** @deprecated 请直接 import { toast } from "sonner" */
 export function useToast() {
-  const context = useContext(ToastContext)
-  if (!context) {
-    throw new Error("useToast must be used within ToastProvider")
+  console.warn("useToast is deprecated. Use import { toast } from 'sonner' instead.")
+  return {
+    toast: (message: string, _type?: string) => {
+      import("sonner").then(({ toast }) => toast(message))
+    },
+    error: (message: string) => {
+      import("sonner").then(({ toast }) => toast.error(message))
+    },
+    success: (message: string) => {
+      import("sonner").then(({ toast }) => toast.success(message))
+    },
   }
-  return context
 }

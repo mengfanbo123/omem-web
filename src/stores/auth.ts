@@ -7,6 +7,7 @@ export interface User {
   apiKey: string
   apiUrl: string
   lastUsed: string
+  spaceName?: string
 }
 
 interface AuthState {
@@ -52,9 +53,14 @@ export const useAuthStore = create<AuthState>()(
           }
         }),
       logout: () =>
-        set({
-          currentUserId: null,
-          isAuthenticated: false,
+        set(() => {
+          // 清理所有敏感数据
+          sessionStorage.removeItem("omem-auth")
+          sessionStorage.removeItem("omem-vault-hash")
+          return {
+            currentUserId: null,
+            isAuthenticated: false,
+          }
         }),
     }),
     {

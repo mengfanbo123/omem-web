@@ -7,15 +7,19 @@ import {
   Import,
   Settings,
   ChevronRight,
+  User,
+  Lock,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navItems = [
   { icon: LayoutDashboard, label: "仪表盘", path: "/dashboard" },
   { icon: Brain, label: "记忆管理", path: "/memories" },
+  { icon: Lock, label: "私密记忆", path: "/vault" },
   { icon: Home, label: "空间管理", path: "/spaces" },
   { icon: BarChart3, label: "统计分析", path: "/analytics" },
   { icon: Import, label: "批量导入", path: "/import" },
+  { icon: User, label: "个人中心", path: "/profile" },
   { icon: Settings, label: "系统设置", path: "/settings" },
 ]
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
-import { Key, Globe, Plus, Trash2, Check } from "lucide-react"
+import { Key, Trash2, Check, Eye, EyeOff } from "lucide-react"
 import { useAuthStore } from "@/stores/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,24 +14,16 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card"
-
-interface FormData {
-  name: string
-  apiKey: string
-  apiUrl: string
-}
+import { maskApiKey } from "@/lib/utils"
 
 export function LoginPage() {
   const navigate = useNavigate()
   const { users, currentUserId, addUser, setCurrentUser, removeUser } = useAuthStore()
 
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    apiKey: "",
-    apiUrl: "",
-  })
+  const [apiKey, setApiKey] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -39,28 +31,37 @@ export function LoginPage() {
     setIsLoading(true)
 
     try {
-      // 验证 API Key 和连接
-      const baseUrl = formData.apiUrl.trim() || window.location.origin
-      const response = await axios.get(`${baseUrl}/health`, {
-        headers: {
-          "X-API-Key": formData.apiKey,
-        },
+      const baseUrl = window.location.origin
+      const client = axios.create({
+        baseURL: baseUrl,
+        headers: { "X-API-Key": apiKey },
+        timeout: 10000,
       })
 
-      if (response.status === 200) {
-        // 保存用户
-        const newUser = {
-          id: crypto.randomUUID(),
-          name: formData.name || "未命名账号",
-          apiKey: formData.apiKey,
-          apiUrl: baseUrl,
-          lastUsed: new Date().toISOString(),
-        }
-        addUser(newUser)
-        navigate("/dashboard")
+      const healthRes = await client.get("/health")
+      if (healthRes.status !== 200) {
+        throw new Error("health check failed")
       }
+
+      let spaceName = "默认空间"
+      const spacesRes = await client.get("/v1/spaces")
+      const spaces = spacesRes.data?.spaces || []
+      if (spaces.length > 0 && spaces[0].name) {
+        spaceName = spaces[0].name
+      }
+
+      const newUser = {
+        id: crypto.randomUUID(),
+        name: spaceName,
+        apiKey,
+        apiUrl: baseUrl,
+        lastUsed: new Date().toISOString(),
+        spaceName,
+      }
+      addUser(newUser)
+      navigate("/dashboard")
     } catch (err) {
-      setError("验证失败，请检查 API Key 和 URL 是否正确")
+      setError("验证失败，请检查 API Key 是否正确")
     } finally {
       setIsLoading(false)
     }
@@ -80,149 +81,118 @@ export function LoginPage() {
     <div className="flex min-h-screen flex-col bg-background">
       <div className="flex flex-1 items-center justify-center p-4">
         <div className="w-full max-w-md space-y-6">
-        <Card>
-          <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl font-semibold">登录 omem</CardTitle>
-            <CardDescription>
-              输入 API Key 以访问您的记忆库
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">账号名称</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="例如：个人账号、工作账号"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <div className="relative">
-                  <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="apiKey"
-                    type="password"
-                    placeholder="输入您的 omem API Key"
-                    value={formData.apiKey}
-                    onChange={(e) =>
-                      setFormData({ ...formData, apiKey: e.target.value })
-                    }
-                    className="pl-9"
-                    disabled={isLoading}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="apiUrl">API URL（可选）</Label>
-                <div className="relative">
-                  <Globe className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="apiUrl"
-                    type="text"
-                    placeholder="留空使用默认 /"
-                    value={formData.apiUrl}
-                    onChange={(e) =>
-                      setFormData({ ...formData, apiUrl: e.target.value })
-                    }
-                    className="pl-9"
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !formData.apiKey}
-              >
-                {isLoading ? "验证中..." : "验证并登录"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {users.length > 0 && (
           <Card>
-            <CardHeader className="space-y-2 pb-3">
-              <CardTitle className="text-base font-medium">
-                已保存的账号
-              </CardTitle>
+            <CardHeader className="space-y-2">
+              <CardTitle className="text-2xl font-semibold">登录 omem</CardTitle>
+              <CardDescription>
+                输入 API Key 以访问您的记忆库
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleSelectUser(user)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault()
-                      handleSelectUser(user)
-                    }
-                  }}
-                  className="group flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 transition-all hover:border-ring hover:bg-muted/50 cursor-pointer"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                        currentUserId === user.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      }`}
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">API Key</Label>
+                  <div className="relative">
+                    <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="apiKey"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="输入您的 omem API Key"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      className="pl-9 pr-10"
+                      disabled={isLoading}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
+                      tabIndex={-1}
                     >
-                      {currentUserId === user.id ? (
-                        <Check className="h-4 w-4" />
-                      ) : (
-                        <Key className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {user.apiUrl || "/"}
-                      </p>
-                    </div>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleRemoveUser(e, user.id)
-                    }}
-                    className="opacity-0 transition-opacity group-hover:opacity-100"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
                 </div>
-              ))}
+
+                {error && (
+                  <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading || !apiKey}
+                >
+                  {isLoading ? "验证中..." : "验证并登录"}
+                </Button>
+              </form>
             </CardContent>
           </Card>
-        )}
 
-        {users.length > 0 && (
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Plus className="h-4 w-4" />
-            <span>上方表单可添加新账号</span>
-          </div>
-        )}
-      </div>
+          {users.length > 0 && (
+            <Card>
+              <CardHeader className="space-y-2 pb-3">
+                <CardTitle className="text-base font-medium">
+                  已保存的账号
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {users.map((user) => (
+                  <div
+                    key={user.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleSelectUser(user)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        handleSelectUser(user)
+                      }
+                    }}
+                    className="group flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 transition-all hover:border-ring hover:bg-muted/50 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          currentUserId === user.id
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {currentUserId === user.id ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Key className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium">{user.spaceName || user.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {maskApiKey(user.apiKey)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRemoveUser(e, user.id)
+                      }}
+                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
       <AppFooter />
     </div>

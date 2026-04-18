@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { isPrivateMemory, formatContent, formatDate } from '@/views/memories/memory-list'
+import { formatContent, formatDate } from '@/views/memories/memory-list'
+import { isPrivateMemory } from '@/lib/tag-utils'
 
 const createMemory = (tags: string[]) => ({
   id: 'test-id',
@@ -22,13 +23,13 @@ const createMemory = (tags: string[]) => ({
 
 describe('Memory List Utils', () => {
   it('should detect private memory by tag', () => {
-    expect(isPrivateMemory(createMemory(['私密']))).toBe(true)
-    expect(isPrivateMemory(createMemory(['工作', '私密']))).toBe(true)
+    expect(isPrivateMemory(createMemory(['私密']).tags)).toBe(true)
+    expect(isPrivateMemory(createMemory(['工作', '私密']).tags)).toBe(true)
   })
 
   it('should not detect private memory without tag', () => {
-    expect(isPrivateMemory(createMemory(['工作']))).toBe(false)
-    expect(isPrivateMemory(createMemory([]))).toBe(false)
+    expect(isPrivateMemory(createMemory(['工作']).tags)).toBe(false)
+    expect(isPrivateMemory(createMemory([]).tags)).toBe(false)
   })
 
   it('should format content with truncation', () => {

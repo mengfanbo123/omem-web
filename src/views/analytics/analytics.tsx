@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { useToast } from "@/providers/toast-provider"
+import { toast } from "sonner"
 import {
   BarChart,
   Bar,
@@ -58,7 +58,6 @@ const COLORS = [
 
 export function AnalyticsPage() {
   const navigate = useNavigate()
-  const { error: showError } = useToast()
   const [stats, setStats] = useState<StatsData | null>(null)
   const [memories, setMemories] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -74,13 +73,13 @@ export function AnalyticsPage() {
         setStats(statsRes as StatsData)
         setMemories((memoriesRes as { memories: MemoryItem[] }).memories || [])
       } catch (err: any) {
-        showError("加载统计数据失败: " + err.message)
+        toast.error("加载统计数据失败: " + err.message)
       } finally {
         setLoading(false)
       }
     }
     fetchData()
-  }, [showError])
+  }, [])
 
   const categoryData = useMemo(() => {
     const counts: Record<string, number> = {}

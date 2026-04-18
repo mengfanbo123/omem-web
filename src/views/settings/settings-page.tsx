@@ -4,6 +4,16 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { useTheme } from "@/providers/theme-provider"
 import { useVaultStore } from "@/stores/vault"
 import { toast } from "sonner"
@@ -15,6 +25,7 @@ export function SettingsPage() {
   const [newPassword, setNewPassword] = useState("")
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [exportingMemories, setExportingMemories] = useState(false)
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
 
   const handleClearCache = () => {
     sessionStorage.clear()
@@ -24,12 +35,11 @@ export function SettingsPage() {
   }
 
   const handleResetVault = () => {
-    if (window.confirm("确定要重置 Vault 密码吗？此操作不可恢复！")) {
-      lock()
-      sessionStorage.removeItem("omem-vault-hash")
-      toast.success("Vault 已重置")
-      setShowPasswordForm(false)
-    }
+    lock()
+    sessionStorage.removeItem("omem-vault-hash")
+    toast.success("Vault 已重置")
+    setShowPasswordForm(false)
+    setResetDialogOpen(false)
   }
 
   const handleSetVaultPassword = () => {
@@ -158,7 +168,7 @@ export function SettingsPage() {
                 <Button
                   variant="destructive"
                   size="sm"
-                  onClick={handleResetVault}
+                  onClick={() => setResetDialogOpen(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   重置 Vault
@@ -257,6 +267,23 @@ export function SettingsPage() {
           </p>
         </div>
       </Card>
+
+      <AlertDialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认重置 Vault</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作不可恢复。重置后所有受 Vault 保护的私密记忆将无法访问。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setResetDialogOpen(false)}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetVault} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              确认重置
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,13 +1,42 @@
 import { useEffect, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import apiClient from "@/api/client"
 import { useVaultStore } from "@/stores/vault"
-import { ArrowLeft, Lock, Calendar, Hash, Tag, Eye, Unlock, Pencil } from "lucide-react"
+import {
+  isPrivateMemory,
+  getTagClassName,
+  getTierLabel,
+  getTierBadgeClass,
+  PRIVATE_TAG,
+} from "@/lib/tag-utils"
+import {
+  ArrowLeft,
+  Lock,
+  Calendar,
+  Hash,
+  Tag,
+  Eye,
+  Unlock,
+  Pencil,
+  Layers,
+  Info,
+  BarChart3,
+  Globe,
+} from "lucide-react"
 
 interface MemoryDetail {
   id: string
@@ -31,12 +60,6 @@ interface MemoryDetail {
   updated_at: string
 }
 
-const PRIVATE_TAG = "私密"
-
-function isPrivateMemory(memory: MemoryDetail): boolean {
-  return memory.tags?.includes(PRIVATE_TAG) || false
-}
-
 function formatDate(dateString: string) {
   const date = new Date(dateString)
   return date.toLocaleString("zh-CN", {
@@ -51,21 +74,24 @@ function formatDate(dateString: string) {
 
 function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
   const [password, setPassword] = useState("")
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const isFirstTime = !useVaultStore.getState().passwordHash
   const setVaultPassword = useVaultStore((s) => s.setPassword)
   const verifyPassword = useVaultStore((s) => s.verifyPassword)
 
-  const handleSubmit = () => {
-    if (!password.trim()) return
+  const handleSubmit = async () => {
+    if (!password.trim()) {
+      setError("请输入密码")
+      return
+    }
     if (isFirstTime) {
-      setVaultPassword(password)
+      await setVaultPassword(password)
       onUnlock()
-    } else if (verifyPassword(password)) {
-      setError(false)
+    } else if (await verifyPassword(password)) {
+      setError(null)
       onUnlock()
     } else {
-      setError(true)
+      setError("密码错误")
     }
   }
 
@@ -87,7 +113,7 @@ function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
           value={password}
           onChange={(e) => {
             setPassword(e.target.value)
-            setError(false)
+            setError(null)
           }}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           className={error ? "border-destructive" : ""}
@@ -97,8 +123,102 @@ function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
         </Button>
       </div>
       {error && (
-        <p className="text-xs text-destructive">密码错误</p>
+        <p className="text-xs text-destructive">{error}</p>
       )}
+    </div>
+  )
+}
+
+function ContentTabs({ memory }: { memory: MemoryDetail }) {
+  const levels: { key: keyof MemoryDetail; label: string }[] = [
+    { key: "l0_abstract", label: "摘要" },
+    { key: "l1_overview", label: "概览" },
+    { key: "l2_content", label: "详情" },
+    { key: "content", label: "原文" },
+  ]
+
+  const available = levels.filter(
+    (l) => memory[l.key] !== undefined && memory[l.key] !== null
+  )
+
+  const storageKey = `omem-memory-tab-${memory.id}`
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(storageKey)
+      if (saved && available.some((l) => l.key === saved)) return saved
+    } catch {}
+    return available[0]?.key
+  })
+
+  if (available.length === 0) {
+    return (
+      <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
+        无内容
+      </div>
+    )
+  }
+
+  if (available.length === 1) {
+    const content = memory[available[0].key] as string
+    const isEmpty = !content || content.trim().length === 0
+    return (
+      <div className="rounded-lg border border-border bg-card p-4 prose prose-sm dark:prose-invert max-w-none">
+        {isEmpty ? (
+          <div className="text-sm text-muted-foreground">无内容</div>
+        ) : (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {content}
+          </ReactMarkdown>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => {
+        setActiveTab(value)
+        try {
+          sessionStorage.setItem(storageKey, value)
+        } catch {}
+      }}
+      className="w-full"
+    >
+      <TabsList className="mb-2">
+        {available.map((l) => (
+          <TabsTrigger key={l.key} value={l.key}>
+            <Layers className="size-3 mr-1" />
+            {l.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {available.map((l) => {
+        const content = memory[l.key] as string
+        const isEmpty = !content || content.trim().length === 0
+        return (
+          <TabsContent key={l.key} value={l.key}>
+            <div className="rounded-lg border border-border bg-card p-4 prose prose-sm dark:prose-invert max-w-none">
+              {isEmpty ? (
+                <div className="text-sm text-muted-foreground">无内容</div>
+              ) : (
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {content}
+                </ReactMarkdown>
+              )}
+            </div>
+          </TabsContent>
+        )
+      })}
+    </Tabs>
+  )
+}
+
+function MetaItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <div className="text-sm font-medium">{value}</div>
     </div>
   )
 }
@@ -165,7 +285,7 @@ export function MemoryDetailPage() {
     )
   }
 
-  const isPrivate = isPrivateMemory(memory)
+  const isPrivate = isPrivateMemory(memory.tags)
   const showContent = !isPrivate || vaultUnlocked || localUnlocked
 
   return (
@@ -185,12 +305,20 @@ export function MemoryDetailPage() {
               私密记忆
             </Badge>
           )}
+          <Badge
+            variant="outline"
+            className={getTierBadgeClass(memory.tier)}
+          >
+            {getTierLabel(memory.tier)}
+          </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/memories/${id}/edit`)}>
-            <Pencil className="size-3.5 mr-1.5" />
-            编辑
-          </Button>
+          {showContent && (
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/memories/${id}/edit`)}>
+              <Pencil className="size-3.5 mr-1.5" />
+              编辑
+            </Button>
+          )}
           {(vaultUnlocked || localUnlocked) && isPrivate && (
             <Button variant="ghost" size="sm" onClick={() => {
               vaultLock()
@@ -205,7 +333,7 @@ export function MemoryDetailPage() {
 
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold tracking-tight">
-          {isPrivate ? "🔒 私密记忆" : "记忆详情"}
+          {isPrivate && !showContent ? "🔒 私密记忆" : "记忆详情"}
         </h1>
         <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1">
@@ -225,86 +353,118 @@ export function MemoryDetailPage() {
 
       <Separator />
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground">内容</h2>
-            {showContent && isPrivate && (
-              <span className="flex items-center gap-1 text-xs text-amber-500">
-                <Unlock className="size-3" />
-                已解锁
-              </span>
-            )}
-          </div>
+      {showContent ? (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5 text-base">
+                <Layers className="size-4 text-muted-foreground" />
+                内容
+                {isPrivate && (
+                  <span className="flex items-center gap-1 text-xs text-amber-500 ml-auto font-normal">
+                    <Unlock className="size-3" />
+                    已解锁
+                  </span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ContentTabs memory={memory} />
+            </CardContent>
+          </Card>
 
-          {showContent ? (
-            <div className="rounded-lg border border-border bg-card p-4">
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-                {memory.content}
-              </p>
-            </div>
-          ) : (
-            <VaultUnlock onUnlock={() => setLocalUnlocked(true)} />
+          {memory.tags && memory.tags.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  <Tag className="size-4 text-muted-foreground" />
+                  标签
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {memory.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="outline"
+                      className={getTagClassName(tag)}
+                    >
+                      {tag === PRIVATE_TAG && (
+                        <Lock className="size-2.5 mr-1" />
+                      )}
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
-        </div>
 
-        <div className="space-y-2">
-          <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-            <Tag className="size-3.5" />
-            标签
-          </h2>
-          <div className="flex flex-wrap gap-2">
-            {memory.tags?.map((tag) => (
-              <Badge
-                key={tag}
-                variant={tag === PRIVATE_TAG ? "default" : "outline"}
-                className={
-                  tag === PRIVATE_TAG
-                    ? "bg-amber-500/20 text-amber-500 border-amber-500/30 hover:bg-amber-500/30"
-                    : ""
-                }
-              >
-                {tag}
-              </Badge>
-            )) || <span className="text-sm text-muted-foreground">无标签</span>}
-          </div>
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  <Info className="size-4 text-muted-foreground" />
+                  基本信息
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <MetaItem label="分类" value={memory.category || "—"} />
+                <MetaItem label="类型" value={memory.memory_type || "—"} />
+                <MetaItem label="状态" value={memory.state || "—"} />
+                <MetaItem
+                  label="等级"
+                  value={
+                    <Badge variant="outline" className={getTierBadgeClass(memory.tier)}>
+                      {getTierLabel(memory.tier)}
+                    </Badge>
+                  }
+                />
+              </CardContent>
+            </Card>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">分类</span>
-            <p className="text-sm font-medium">{memory.category || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">类型</span>
-            <p className="text-sm font-medium">{memory.memory_type || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">等级</span>
-            <p className="text-sm font-medium">{memory.tier || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">重要性</span>
-            <p className="text-sm font-medium">{memory.importance?.toFixed(2) || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">置信度</span>
-            <p className="text-sm font-medium">{memory.confidence?.toFixed(2) || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">状态</span>
-            <p className="text-sm font-medium">{memory.state || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">范围</span>
-            <p className="text-sm font-medium">{memory.scope || "—"}</p>
-          </div>
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">来源</span>
-            <p className="text-sm font-medium">{memory.source || "—"}</p>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  <BarChart3 className="size-4 text-muted-foreground" />
+                  质量指标
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <MetaItem
+                  label="重要性"
+                  value={memory.importance?.toFixed(2) ?? "—"}
+                />
+                <MetaItem
+                  label="置信度"
+                  value={memory.confidence?.toFixed(2) ?? "—"}
+                />
+                <MetaItem
+                  label="访问次数"
+                  value={memory.access_count ?? "—"}
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-base">
+                  <Globe className="size-4 text-muted-foreground" />
+                  来源信息
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <MetaItem label="来源" value={memory.source || "—"} />
+                <MetaItem label="范围" value={memory.scope || "—"} />
+                <MetaItem label="Agent ID" value={memory.agent_id || "—"} />
+                <MetaItem label="Session ID" value={memory.session_id || "—"} />
+              </CardContent>
+            </Card>
           </div>
         </div>
-      </div>
+      ) : (
+        <VaultUnlock onUnlock={() => setLocalUnlocked(true)} />
+      )}
     </div>
   )
 }
