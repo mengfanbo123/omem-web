@@ -1,2 +1,0 @@
-[    1523ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5173/login?redirect=/memories:0
-[   23408ms] [ERROR] Login failed: {error: Object} @ http://localhost:5173/src/views/Login.vue:39

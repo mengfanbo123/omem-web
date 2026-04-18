@@ -1,3 +1,0 @@
-[    2751ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "new-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:5173/login?redirect=/memories:0
-[  753216ms] [WARNING] [Vue Router warn]: No match found for location with path "/spaces" @ http://localhost:5173/node_modules/.vite/deps/vue-router.js?v=8b5d90f9:51
-[  755660ms] [WARNING] [Vue Router warn]: No match found for location with path "/analytics" @ http://localhost:5173/node_modules/.vite/deps/vue-router.js?v=8b5d90f9:51

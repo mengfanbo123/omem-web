@@ -1,15 +1,12 @@
 import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
+import react from '@vitejs/plugin-react'
 
+// https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-    }
+      '@': new URL('./src', import.meta.url).pathname,
+    },
   },
-  server: {
-    port: 5173
-  }
 })
