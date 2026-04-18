@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Moon, Sun, Monitor, Trash2, Lock, Download, Info } from "lucide-react"
+import { Moon, Sun, Monitor, Trash2, Lock, Download, Info, Database } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -7,12 +7,14 @@ import { Separator } from "@/components/ui/separator"
 import { useTheme } from "@/providers/theme-provider"
 import { useVaultStore } from "@/stores/vault"
 import { toast } from "sonner"
+import apiClient from "@/api/client"
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { passwordHash, setPassword, lock } = useVaultStore()
   const [newPassword, setNewPassword] = useState("")
   const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [exportingMemories, setExportingMemories] = useState(false)
 
   const handleClearCache = () => {
     sessionStorage.clear()
@@ -41,7 +43,7 @@ export function SettingsPage() {
     setShowPasswordForm(false)
   }
 
-  const handleExportData = () => {
+  const handleExportConfig = () => {
     const data = {
       auth: JSON.parse(sessionStorage.getItem("omem-auth") || "{}"),
       vault: sessionStorage.getItem("omem-vault-hash") || null,
@@ -54,10 +56,39 @@ export function SettingsPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `omem-backup-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `omem-config-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
-    toast.success("数据已导出")
+    toast.success("本地配置已导出")
+  }
+
+  const handleExportMemories = async () => {
+    setExportingMemories(true)
+    try {
+      const response = await apiClient.get("/v1/memories", {
+        params: { limit: 10000 },
+      })
+      const data = {
+        memories: response.memories || [],
+        total_count: response.total_count || 0,
+        exportedAt: new Date().toISOString(),
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `omem-memories-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`已导出 ${data.total_count} 条记忆`)
+    } catch (err) {
+      console.error("Failed to export memories:", err)
+      toast.error("导出记忆数据失败")
+    } finally {
+      setExportingMemories(false)
+    }
   }
 
   return (
@@ -172,12 +203,25 @@ export function SettingsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">导出数据</p>
+              <p className="text-sm font-medium">导出记忆数据</p>
               <p className="text-xs text-muted-foreground">
-                将会话数据导出为 JSON 文件备份
+                从服务端导出所有记忆为 JSON 文件
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportData}>
+            <Button variant="outline" size="sm" onClick={handleExportMemories} disabled={exportingMemories}>
+              <Database className="h-4 w-4 mr-2" />
+              {exportingMemories ? "导出中..." : "导出"}
+            </Button>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">导出本地配置</p>
+              <p className="text-xs text-muted-foreground">
+                将登录信息、主题等本地设置导出备份
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportConfig}>
               <Download className="h-4 w-4 mr-2" />
               导出
             </Button>
