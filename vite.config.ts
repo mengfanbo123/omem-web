@@ -9,4 +9,18 @@ export default defineConfig({
       '@': new URL('./src', import.meta.url).pathname,
     },
   },
+  server: {
+    proxy: {
+      '/v1': {
+        target: 'https://www.mengxy.cc',
+        changeOrigin: true,
+        secure: true,
+      },
+      '/health': {
+        target: 'https://www.mengxy.cc',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
 })
