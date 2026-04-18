@@ -164,9 +164,10 @@ export function LoginPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {users.map((user) => (
-                <button
+                <div
                   key={user.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectUser(user)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -174,7 +175,7 @@ export function LoginPage() {
                       handleSelectUser(user)
                     }
                   }}
-                  className="group flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 transition-all hover:border-ring hover:bg-muted/50"
+                  className="group flex w-full items-center justify-between rounded-lg border border-border bg-card p-3 transition-all hover:border-ring hover:bg-muted/50 cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -209,7 +210,7 @@ export function LoginPage() {
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
-                </button>
+                </div>
               ))}
             </CardContent>
           </Card>

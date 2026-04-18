@@ -61,8 +61,8 @@ export const useAuthStore = create<AuthState>()(
       name: "omem-auth",
       storage: {
         getItem: (name) => {
-          const str = sessionStorage.getItem(name)
-          return str ? JSON.parse(str) : null
+          const item = sessionStorage.getItem(name)
+          return item ? JSON.parse(item) : null
         },
         setItem: (name, value) => {
           sessionStorage.setItem(name, JSON.stringify(value))

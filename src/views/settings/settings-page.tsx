@@ -44,7 +44,7 @@ export function SettingsPage() {
   const handleExportData = () => {
     const data = {
       auth: JSON.parse(sessionStorage.getItem("omem-auth") || "{}"),
-      vault: JSON.parse(sessionStorage.getItem("omem-vault-hash") || "null"),
+      vault: sessionStorage.getItem("omem-vault-hash") || null,
       theme: localStorage.getItem("omem-theme") || "system",
       exportedAt: new Date().toISOString(),
     }

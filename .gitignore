@@ -27,4 +27,6 @@ dist-ssr
 *.png
 screenshot*
 .playwright-mcp/
+tests/
+*-snapshot.md
 
