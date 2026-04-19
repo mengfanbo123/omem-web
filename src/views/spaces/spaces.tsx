@@ -406,32 +406,28 @@ export function SpacesPage() {
                 {currentManageSpace?.members.map((m) => {
                   const info = memberInfos[m.user_id]
                   return (
-                    <div key={m.user_id} className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 overflow-hidden">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <User className="size-3.5 text-muted-foreground shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <div className="font-mono text-xs truncate flex-1" title={m.user_id}>{m.user_id}</div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(m.user_id)
-                                toast.success("API Key 已复制")
-                              }}
-                              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                              title="复制 API Key"
-                            >
-                              <Copy className="size-3" />
-                            </button>
+                    <div key={m.user_id} className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 min-w-0">
+                      <User className="size-3.5 text-muted-foreground shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-xs truncate" title={m.user_id}>{m.user_id}</div>
+                        {info && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {info.name} · {new Date(info.created_at).toLocaleDateString('zh-CN')}
                           </div>
-                          {info && (
-                            <div className="text-xs text-muted-foreground">
-                              {info.name} · {new Date(info.created_at).toLocaleDateString('zh-CN')}
-                            </div>
-                          )}
-                        </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(m.user_id)
+                            toast.success("API Key 已复制")
+                          }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          title="复制 API Key"
+                        >
+                          <Copy className="size-3.5" />
+                        </button>
                         <Badge variant="outline">{m.role}</Badge>
                         {currentManageSpace && isSpaceAdmin(currentManageSpace) && m.user_id !== currentUser?.apiKey && (
                           <button
