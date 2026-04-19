@@ -72,25 +72,19 @@ function formatDate(dateString: string) {
   })
 }
 
-function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
+function VaultUnlock() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const isFirstTime = !useVaultStore.getState().passwordHash
-  const setVaultPassword = useVaultStore((s) => s.setPassword)
-  const verifyPassword = useVaultStore((s) => s.verifyPassword)
+  const unlock = useVaultStore((s) => s.unlock)
 
   const handleSubmit = async () => {
     if (!password.trim()) {
       setError("请输入密码")
       return
     }
-    if (isFirstTime) {
-      await setVaultPassword(password)
-      onUnlock()
-    } else if (await verifyPassword(password)) {
-      setError(null)
-      onUnlock()
-    } else {
+    const success = await unlock(password)
+    if (!success) {
       setError("密码错误")
     }
   }
@@ -137,9 +131,10 @@ function ContentTabs({ memory }: { memory: MemoryDetail }) {
     { key: "content", label: "原文" },
   ]
 
-  const available = levels.filter(
-    (l) => memory[l.key] !== undefined && memory[l.key] !== null
-  )
+  const available = levels.filter((l) => {
+    const v = memory[l.key]
+    return v !== undefined && v !== null && String(v).trim().length > 0
+  })
 
   const storageKey = `omem-memory-tab-${memory.id}`
   const [activeTab, setActiveTab] = useState(() => {
@@ -147,8 +142,18 @@ function ContentTabs({ memory }: { memory: MemoryDetail }) {
       const saved = sessionStorage.getItem(storageKey)
       if (saved && available.some((l) => l.key === saved)) return saved
     } catch {}
-    return available[0]?.key
+    return (
+      available.find((l) => l.key === "content")?.key ||
+      available.find((l) => l.key === "l2_content")?.key ||
+      available[0]?.key
+    )
   })
+
+  useEffect(() => {
+    if (!activeTab || !available.some((l) => l.key === activeTab)) {
+      setActiveTab(available[0]?.key)
+    }
+  }, [available, activeTab])
 
   if (available.length === 0) {
     return (
@@ -231,7 +236,6 @@ export function MemoryDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
   const vaultLock = useVaultStore((s) => s.lock)
-  const [localUnlocked, setLocalUnlocked] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -241,7 +245,15 @@ export function MemoryDetailPage() {
         setLoading(true)
         setError(null)
         const response = await apiClient.get<MemoryDetail>(`/v1/memories/${id}`)
-        setMemory(response)
+        console.log("Memory detail raw response:", response)
+        // 兼容后端可能返回的不同字段名
+        const mapped: MemoryDetail = {
+          ...response,
+          l0_abstract: (response as any).l0_abstract ?? (response as any).abstract ?? "",
+          l1_overview: (response as any).l1_overview ?? (response as any).overview ?? "",
+          l2_content: (response as any).l2_content ?? (response as any).detail ?? "",
+        }
+        setMemory(mapped)
       } catch (err) {
         console.error("Failed to fetch memory:", err)
         setError("加载记忆详情失败")
@@ -286,7 +298,7 @@ export function MemoryDetailPage() {
   }
 
   const isPrivate = isPrivateMemory(memory.tags)
-  const showContent = !isPrivate || vaultUnlocked || localUnlocked
+  const showContent = !isPrivate || vaultUnlocked
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -319,10 +331,9 @@ export function MemoryDetailPage() {
               编辑
             </Button>
           )}
-          {(vaultUnlocked || localUnlocked) && isPrivate && (
+          {vaultUnlocked && isPrivate && (
             <Button variant="ghost" size="sm" onClick={() => {
               vaultLock()
-              setLocalUnlocked(false)
             }}>
               <Lock className="size-3.5 mr-1.5" />
               锁定
@@ -463,7 +474,7 @@ export function MemoryDetailPage() {
           </div>
         </div>
       ) : (
-        <VaultUnlock onUnlock={() => setLocalUnlocked(true)} />
+        <VaultUnlock />
       )}
     </div>
   )

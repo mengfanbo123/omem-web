@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select"
 import apiClient from "@/api/client"
 import { toast } from "sonner"
-import { Users, Shield, Calendar, Plus, Trash2 } from "lucide-react"
+import { Users, Shield, Calendar, Plus, Trash2, UserPlus, User } from "lucide-react"
 
 interface Space {
   id: string
@@ -54,6 +54,12 @@ export function SpacesPage() {
   const [newSpaceName, setNewSpaceName] = useState("")
   const [newSpaceType, setNewSpaceType] = useState("team")
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [manageSpaceId, setManageSpaceId] = useState<string | null>(null)
+  const [newMemberId, setNewMemberId] = useState("")
+  const [newMemberRole, setNewMemberRole] = useState("member")
+  const [addingMember, setAddingMember] = useState(false)
+
+  const currentManageSpace = spaces.find((s) => s.id === manageSpaceId)
 
   useEffect(() => {
     async function fetchSpaces() {
@@ -95,7 +101,7 @@ export function SpacesPage() {
   async function confirmDeleteSpace() {
     if (!deleteTarget) return
     try {
-      await apiClient.delete(`/v1/spaces/${deleteTarget}`)
+      await apiClient.delete(`/v1/spaces/${encodeURIComponent(deleteTarget)}`)
       toast.success("空间已删除")
       setSpaces((prev) => prev.filter((s) => s.id !== deleteTarget))
     } catch (err) {
@@ -103,6 +109,42 @@ export function SpacesPage() {
       toast.error("空间删除失败")
     } finally {
       setDeleteTarget(null)
+    }
+  }
+
+  async function addMember() {
+    if (!manageSpaceId || !newMemberId.trim()) {
+      toast.error("请输入用户ID")
+      return
+    }
+    const userId = newMemberId.trim()
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(userId)) {
+      toast.error("用户ID格式不正确，请输入有效的 UUID（如：c60beb98-7aab-4985-8c1d-29ffd6aff75a）")
+      return
+    }
+    setAddingMember(true)
+    try {
+      await apiClient.post(`/v1/spaces/${encodeURIComponent(manageSpaceId)}/members`, {
+        user_id: userId,
+        role: newMemberRole,
+      })
+      toast.success("成员添加成功")
+      setNewMemberId("")
+      const response = await apiClient.get<Space[]>('/v1/spaces')
+      setSpaces(response || [])
+    } catch (err: any) {
+      console.error("Failed to add member:", err)
+      const msg = err.response?.data?.error || err.message || ""
+      if (msg.includes("not found") || msg.includes("不存在")) {
+        toast.error("该用户不存在，请确认用户ID正确")
+      } else if (msg.includes("permission") || msg.includes("权限")) {
+        toast.error("您没有权限添加成员")
+      } else {
+        toast.error(`添加成员失败：${msg || "请检查用户ID是否正确"}`)
+      }
+    } finally {
+      setAddingMember(false)
     }
   }
 
@@ -195,6 +237,19 @@ export function SpacesPage() {
                     </div>
                     <Button
                       variant="ghost"
+                      size="sm"
+                      className="h-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => {
+                        setManageSpaceId(space.id)
+                        setNewMemberId("")
+                        setNewMemberRole("member")
+                      }}
+                    >
+                      <UserPlus className="size-3.5 mr-1" />
+                      管理成员
+                    </Button>
+                    <Button
+                      variant="ghost"
                       size="icon"
                       className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={() => setDeleteTarget(space.id)}
@@ -240,6 +295,57 @@ export function SpacesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!manageSpaceId} onOpenChange={(open) => !open && setManageSpaceId(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>管理成员 - {currentManageSpace?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <span className="text-sm font-medium">当前成员</span>
+              <div className="space-y-1">
+                {currentManageSpace?.members.map((m) => (
+                  <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <User className="size-3.5 text-muted-foreground" />
+                      <span className="font-mono text-xs">{m.user_id}</span>
+                    </div>
+                    <Badge variant="outline">{m.role}</Badge>
+                  </div>
+                ))}
+                {(!currentManageSpace?.members || currentManageSpace.members.length === 0) && (
+                  <p className="text-sm text-muted-foreground">暂无成员</p>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium">添加成员</span>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="输入对方 API Key（UUID格式）"
+                  value={newMemberId}
+                  onChange={(e) => setNewMemberId(e.target.value)}
+                  className="flex-1"
+                />
+                <Select value={newMemberRole} onValueChange={(v) => setNewMemberRole(v || 'member')}>
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">管理员</SelectItem>
+                    <SelectItem value="member">成员</SelectItem>
+                    <SelectItem value="reader">只读</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={addMember} disabled={addingMember}>
+                  {addingMember ? "添加中..." : "添加"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

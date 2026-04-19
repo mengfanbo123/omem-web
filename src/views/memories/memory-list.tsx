@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import {
   AlertDialog,
@@ -16,8 +16,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import apiClient from "@/api/client"
-import { Search, ChevronLeft, ChevronRight, Lock, Unlock, Plus, Trash2, SlidersHorizontal, ArrowUpDown } from "lucide-react"
+import { Search, ChevronLeft, ChevronRight, Lock, Unlock, Plus, Trash2, SlidersHorizontal, ArrowUpDown, RotateCcw, X, Inbox } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useVaultStore } from "@/stores/vault"
 import {
   isPrivateMemory,
   getTagClassName,
@@ -49,6 +50,16 @@ interface MemoriesResponse {
   total_count: number
   limit: number
   offset: number
+}
+
+interface SearchResultItem {
+  memory: MemoryItem
+  score: number
+}
+
+interface SearchResponse {
+  results: SearchResultItem[]
+  trace?: unknown
 }
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -109,7 +120,9 @@ export function MemoryListPage() {
   const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState("")
   const [totalCount, setTotalCount] = useState(0)
-  const [vaultUnlocked, setVaultUnlocked] = useState(false)
+  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
+  const vaultLock = useVaultStore((s) => s.lock)
+  const vaultUnlock = useVaultStore((s) => s.unlock)
   const [showVaultInput, setShowVaultInput] = useState(false)
   const [vaultPassword, setVaultPassword] = useState("")
   const [vaultError, setVaultError] = useState<string | null>(null)
@@ -118,46 +131,74 @@ export function MemoryListPage() {
   const [pageSize, setPageSize] = useState<number>(20)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [privacyFilter, setPrivacyFilter] = useState<'all' | 'public' | 'private'>("public")
-
-  const fetchMemories = useCallback(async (pageNum: number, query: string) => {
-    try {
-      setLoading(true)
-      setError(null)
-      const offset = (pageNum - 1) * pageSize
-      const params: Record<string, string | number | undefined> = {
-        offset,
-        limit: pageSize,
-        search: query || undefined,
-        sort: sortBy,
-      }
-      if (tierFilter !== "all") {
-        params.tier = tierFilter
-      }
-      const response = await apiClient.get<MemoriesResponse>("/v1/memories", {
-        params,
-      })
-      setMemories(response.memories || [])
-      setTotalCount(response.total_count || 0)
-    } catch (err) {
-      console.error("Failed to fetch memories:", err)
-      setError("加载记忆列表失败")
-    } finally {
-      setLoading(false)
-    }
-  }, [tierFilter, sortBy, pageSize])
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'global' | 'private'>("all")
+  const [debouncedQuery, setDebouncedQuery] = useState("")
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1)
-      fetchMemories(1, searchQuery)
+      setDebouncedQuery(searchQuery)
     }, SEARCH_DEBOUNCE_MS)
     return () => clearTimeout(timer)
-  }, [searchQuery, fetchMemories])
+  }, [searchQuery])
 
   useEffect(() => {
-    fetchMemories(page, searchQuery)
-  }, [page, searchQuery, fetchMemories])
+    async function loadMemories() {
+      try {
+        setLoading(true)
+        setError(null)
+        const offset = (page - 1) * pageSize
+        if (debouncedQuery.trim()) {
+          const searchParams: Record<string, string | number | undefined> = {
+            q: debouncedQuery.trim(),
+            offset,
+            limit: pageSize,
+            sort: sortBy,
+            min_score: 0,
+          }
+          if (tierFilter !== "all") {
+            searchParams.tier = tierFilter
+          }
+          if (visibilityFilter === "private") {
+            searchParams.tags = "私密"
+          } else if (visibilityFilter === "global") {
+            searchParams.visibility = "global"
+          }
+          const searchResponse = await apiClient.get<SearchResponse>("/v1/memories/search", {
+            params: searchParams,
+          })
+          setMemories(searchResponse.results?.map((r) => r.memory) || [])
+          setTotalCount(searchResponse.results?.length || 0)
+        } else {
+          const params: Record<string, string | number | undefined> = {
+            offset,
+            limit: pageSize,
+            sort: sortBy,
+          }
+          if (tierFilter !== "all") {
+            params.tier = tierFilter
+          }
+          if (visibilityFilter === "private") {
+            params.tags = "私密"
+          } else if (visibilityFilter === "global") {
+            params.visibility = "global"
+          }
+          const response = await apiClient.get<MemoriesResponse>("/v1/memories", {
+            params,
+          })
+          setMemories(response.memories || [])
+          setTotalCount(response.total_count || 0)
+        }
+      } catch (err) {
+        console.error("Failed to fetch memories:", err)
+        setError("加载记忆列表失败")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadMemories()
+  }, [page, debouncedQuery, tierFilter, sortBy, pageSize, visibilityFilter])
 
   const handleRowClick = (id: string) => {
     navigate(`/memories/${id}`)
@@ -165,6 +206,21 @@ export function MemoryListPage() {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value)
+  }
+
+  const activeFilters = [
+    searchQuery ? { label: `搜索: "${searchQuery}"`, onClear: () => setSearchQuery("") } : null,
+    tierFilter !== "all" ? { label: `分类: ${tierFilter}`, onClear: () => setTierFilter("all") } : null,
+    sortBy !== "created_at" ? { label: `排序: ${sortBy}`, onClear: () => setSortBy("created_at") } : null,
+    visibilityFilter !== "all" ? { label: visibilityFilter === "private" ? "仅私密" : "仅普通", onClear: () => setVisibilityFilter("all") } : null,
+  ].filter(Boolean) as { label: string; onClear: () => void }[]
+
+  const handleResetFilters = () => {
+    setSearchQuery("")
+    setTierFilter("all")
+    setSortBy("created_at")
+    setVisibilityFilter("all")
+    setPage(1)
   }
 
   const handlePreviousPage = () => {
@@ -175,19 +231,23 @@ export function MemoryListPage() {
     if (page * pageSize < totalCount) setPage(page + 1)
   }
 
-  const handleVaultUnlock = () => {
+  const handleVaultUnlock = async () => {
     if (!vaultPassword.trim()) {
       setVaultError("请输入密码")
       return
     }
+    const isValid = await vaultUnlock(vaultPassword)
+    if (!isValid) {
+      setVaultError("密码错误")
+      return
+    }
     setVaultError(null)
-    setVaultUnlocked(true)
     setShowVaultInput(false)
     setVaultPassword("")
   }
 
   const handleVaultLock = () => {
-    setVaultUnlocked(false)
+    vaultLock()
   }
 
   const handleDeleteClick = (id: string, e: React.MouseEvent) => {
@@ -211,10 +271,8 @@ export function MemoryListPage() {
       const remainingCount = previousMemories.filter((m) => m.id !== targetId).length
       if (remainingCount === 0 && page > 1) {
         setPage(page - 1)
-        fetchMemories(page - 1, searchQuery)
-      } else {
-        fetchMemories(page, searchQuery)
       }
+      // page变化会自动触发useEffect重新加载
     } catch (err) {
       console.error("Failed to delete memory:", err)
       toast.error("删除失败，请重试")
@@ -227,7 +285,6 @@ export function MemoryListPage() {
 
   const hasNext = page * pageSize < totalCount
   const hasPrev = page > 1
-  const privateCount = memories.filter((m) => isPrivateMemory(m.tags)).length
 
   return (
     <div className="space-y-6">
@@ -287,14 +344,21 @@ export function MemoryListPage() {
 
           <Lock className="size-3.5 text-muted-foreground" />
           <select
-            value={privacyFilter}
-            onChange={(e) => { setPrivacyFilter(e.target.value as 'all' | 'public' | 'private'); setPage(1) }}
+            value={visibilityFilter}
+            onChange={(e) => { setVisibilityFilter(e.target.value as 'all' | 'global' | 'private'); setPage(1) }}
             className="h-9 rounded-md border border-input bg-background px-3 text-sm"
           >
             <option value="all">全部记忆</option>
-            <option value="public">普通记忆</option>
+            <option value="global">普通记忆</option>
             <option value="private">私密记忆</option>
           </select>
+
+          {activeFilters.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={handleResetFilters} className="text-muted-foreground hover:text-foreground">
+              <RotateCcw className="size-3.5 mr-1" />
+              重置筛选
+            </Button>
+          )}
         </div>
 
         <Button size="sm" onClick={() => navigate("/memories/new")}>
@@ -318,6 +382,23 @@ export function MemoryListPage() {
           </Button>
         )}
       </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">活跃筛选:</span>
+          {activeFilters.map((filter) => (
+            <button
+              key={filter.label}
+              type="button"
+              onClick={filter.onClear}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            >
+              {filter.label}
+              <X className="size-3" />
+            </button>
+          ))}
+        </div>
+      )}
 
       {showVaultInput && (
         <div className="space-y-2 max-w-md">
@@ -364,23 +445,30 @@ export function MemoryListPage() {
               </div>
             </div>
           ))
+        ) : memories.length === 0 ? (
+          <div className="rounded-lg border border-border bg-card p-12 text-center space-y-4">
+            <Inbox className="h-12 w-12 text-muted-foreground mx-auto" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">
+                {searchQuery || visibilityFilter !== 'all' || tierFilter !== 'all'
+                  ? "未找到匹配的记忆"
+                  : "暂无记忆数据"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {searchQuery || visibilityFilter !== 'all' || tierFilter !== 'all'
+                  ? "尝试调整筛选条件或清除搜索"
+                  : "开始记录您的第一条记忆吧"}
+              </p>
+            </div>
+            {activeFilters.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleResetFilters}>
+                <RotateCcw className="size-3.5 mr-1.5" />
+                清除筛选
+              </Button>
+            )}
+          </div>
         ) : (
-          (() => {
-            const filteredMemories = memories.filter((m) =>
-              privacyFilter === 'all'
-                ? true
-                : privacyFilter === 'private'
-                  ? isPrivateMemory(m.tags)
-                  : !isPrivateMemory(m.tags)
-            )
-            if (filteredMemories.length === 0) {
-              return (
-                <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
-                  {searchQuery || privacyFilter !== 'all' ? "未找到匹配的记忆" : "暂无记忆数据"}
-                </div>
-              )
-            }
-            return filteredMemories.map((memory) => (
+          memories.map((memory) => (
             <button
               type="button"
               key={memory.id}
@@ -423,7 +511,6 @@ export function MemoryListPage() {
               </div>
             </button>
           ))
-          })()
         )}
       </div>
 
@@ -431,11 +518,6 @@ export function MemoryListPage() {
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
             共 {totalCount} 条记忆
-            {privateCount > 0 && (
-              <span className="ml-2 text-amber-500">
-                · {privateCount} 条私密
-              </span>
-            )}
           </p>
           <div className="flex items-center gap-2">
             <Button

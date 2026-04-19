@@ -17,32 +17,37 @@ import {
   PieChart,
   Pie,
   Cell,
-
 } from "recharts"
 import {
   TrendingUp,
-  Tags,
   Layers,
   Brain,
   ArrowLeft,
   BarChart3,
+  Star,
+  Target,
 } from "lucide-react"
 
-interface MemoryItem {
-  id: string
-  category: string
-  tags: string[]
-  importance: number
-  confidence: number
-  memory_type: string
-  tier: string
-  created_at: string
+interface TimelineEntry {
+  date: string
+  count: number
+  by_type: Record<string, number>
 }
 
 interface StatsData {
+  total: number
   total_memories: number
   memories_today: number
   total_spaces: number
+  by_type: Record<string, number>
+  by_category: Record<string, number>
+  by_tier: Record<string, number>
+  by_state: Record<string, number>
+  by_space: Record<string, number>
+  timeline: TimelineEntry[]
+  avg_importance: number
+  avg_confidence: number
+  total_access_count: number
 }
 
 const COLORS = [
@@ -56,22 +61,25 @@ const COLORS = [
   "#f97316",
 ]
 
+function toChartData(record: Record<string, number> | undefined, limit?: number) {
+  if (!record) return []
+  const entries = Object.entries(record)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value)
+  return limit ? entries.slice(0, limit) : entries
+}
+
 export function AnalyticsPage() {
   const navigate = useNavigate()
   const [stats, setStats] = useState<StatsData | null>(null)
-  const [memories, setMemories] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true)
-        const [statsRes, memoriesRes] = await Promise.all([
-          apiClient.get("/v1/stats"),
-          apiClient.get("/v1/memories?limit=1000"),
-        ])
+        const statsRes = await apiClient.get("/v1/stats")
         setStats(statsRes as StatsData)
-        setMemories((memoriesRes as { memories: MemoryItem[] }).memories || [])
       } catch (err: any) {
         toast.error("加载统计数据失败: " + err.message)
       } finally {
@@ -81,64 +89,15 @@ export function AnalyticsPage() {
     fetchData()
   }, [])
 
-  const categoryData = useMemo(() => {
-    const counts: Record<string, number> = {}
-    memories.forEach((m) => {
-      counts[m.category] = (counts[m.category] || 0) + 1
-    })
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 8)
-  }, [memories])
+  const categoryData = useMemo(() => toChartData(stats?.by_category, 8), [stats])
+  const typeData = useMemo(() => toChartData(stats?.by_type), [stats])
+  const tierData = useMemo(() => toChartData(stats?.by_tier), [stats])
+  const stateData = useMemo(() => toChartData(stats?.by_state), [stats])
 
-  const typeData = useMemo(() => {
-    const counts: Record<string, number> = {}
-    memories.forEach((m) => {
-      counts[m.memory_type] = (counts[m.memory_type] || 0) + 1
-    })
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }, [memories])
-
-  const tagData = useMemo(() => {
-    const counts: Record<string, number> = {}
-    memories.forEach((m) => {
-      m.tags?.forEach((tag) => {
-        counts[tag] = (counts[tag] || 0) + 1
-      })
-    })
-    return Object.entries(counts)
-      .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10)
-  }, [memories])
-
-  const tierData = useMemo(() => {
-    const counts: Record<string, number> = {}
-    memories.forEach((m) => {
-      counts[m.tier] = (counts[m.tier] || 0) + 1
-    })
-    return Object.entries(counts).map(([name, value]) => ({ name, value }))
-  }, [memories])
-
-  const importanceDistribution = useMemo(() => {
-    const bins = [
-      { range: "0.0-0.2", count: 0 },
-      { range: "0.2-0.4", count: 0 },
-      { range: "0.4-0.6", count: 0 },
-      { range: "0.6-0.8", count: 0 },
-      { range: "0.8-1.0", count: 0 },
-    ]
-    memories.forEach((m) => {
-      const imp = m.importance || 0
-      if (imp < 0.2) bins[0].count++
-      else if (imp < 0.4) bins[1].count++
-      else if (imp < 0.6) bins[2].count++
-      else if (imp < 0.8) bins[3].count++
-      else bins[4].count++
-    })
-    return bins
-  }, [memories])
+  const activityRate = useMemo(() => {
+    if (!stats || !stats.total || !stats.total_access_count) return "0%"
+    return `${Math.min(100, Math.round((stats.total_access_count / Math.max(1, stats.total)) * 100))}%`
+  }, [stats])
 
   if (loading) {
     return (
@@ -181,7 +140,6 @@ export function AnalyticsPage() {
         </Button>
       </div>
 
-      {/* 统计卡片 */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -191,7 +149,7 @@ export function AnalyticsPage() {
             <Brain className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_memories || 0}</div>
+            <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -202,7 +160,7 @@ export function AnalyticsPage() {
             <TrendingUp className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.memories_today || 0}</div>
+            <div className="text-2xl font-bold">{stats?.memories_today ?? 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -213,25 +171,54 @@ export function AnalyticsPage() {
             <Layers className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.total_spaces || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.total_spaces ?? Object.keys(stats?.by_space ?? {}).length}
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              标签种类
+              活跃度
             </CardTitle>
-            <Tags className="size-4 text-muted-foreground" />
+            <Target className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tagData.length}</div>
+            <div className="text-2xl font-bold">{activityRate}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* 图表 */}
       <div className="grid gap-4 md:grid-cols-2">
-        {/* 分类分布 */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              平均重要性
+            </CardTitle>
+            <Star className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats?.avg_importance ? `${(stats.avg_importance * 100).toFixed(0)}%` : "—"}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              平均置信度
+            </CardTitle>
+            <BarChart3 className="size-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {stats?.avg_confidence ? `${(stats.avg_confidence * 100).toFixed(0)}%` : "—"}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">分类分布</CardTitle>
@@ -272,7 +259,6 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* 记忆类型 */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">记忆类型分布</CardTitle>
@@ -290,25 +276,6 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* 标签 TOP10 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">热门标签 TOP10</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={tagData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip />
-                <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* 层级分布 */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">层级分布</CardTitle>
@@ -334,19 +301,18 @@ export function AnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* 重要性分布 */}
-        <Card className="md:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-base">重要性分布</CardTitle>
+            <CardTitle className="text-base">状态分布</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={importanceDistribution}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={stateData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="range" tick={{ fontSize: 12 }} />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} />
                 <Tooltip />
-                <Bar dataKey="count" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>

@@ -215,7 +215,7 @@ export function DashboardPage() {
           <Plus className="size-4 mr-1.5" />
           新建记忆
         </Button>
-        <Button variant="outline" size="sm" onClick={() => navigate("/memories/import")}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/import")}>
           <Upload className="size-4 mr-1.5" />
           批量导入
         </Button>

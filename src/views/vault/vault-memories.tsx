@@ -21,7 +21,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  Unlock,
   Trash2,
   SlidersHorizontal,
   ArrowUpDown,
@@ -34,7 +33,7 @@ import {
   getTierLabel,
   getTierVariant,
 } from "@/lib/tag-utils"
-import { formatContent, formatDate } from "@/views/memories/memory-list"
+import { formatDate } from "@/views/memories/memory-list"
 
 interface MemoryItem {
   id: string
@@ -372,14 +371,15 @@ export function VaultMemoriesPage() {
             >
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5">
-                  <Unlock className="h-3 w-3 text-amber-500" />
+                  <Lock className="h-3 w-3 text-amber-500" />
                   <span className="text-xs text-amber-500 font-medium">
-                    已解锁
+                    私密记忆
                   </span>
                 </div>
-                <p className="text-sm text-foreground line-clamp-3">
-                  {formatContent(memory.content || memory.l0_abstract)}
-                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 text-amber-500" />
+                  <span>🔒 已加密，请点击解锁</span>
+                </div>
               </div>
               <div className="flex items-center gap-2 mt-3 flex-wrap">
                 <Badge variant="outline" className="font-normal text-xs">
@@ -415,7 +415,7 @@ export function VaultMemoriesPage() {
       {!loading && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            共 {privateMemories.length} 条私密记忆
+            本页共 {privateMemories.length} 条私密记忆
           </p>
           <div className="flex items-center gap-2">
             <Button

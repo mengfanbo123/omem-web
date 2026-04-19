@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom"
+import { useState, useEffect } from "react"
 import { useAuthStore } from "@/stores/auth"
 import { ThemeToggle } from "./theme-toggle"
 import { MobileNav } from "./mobile-nav"
@@ -11,12 +12,36 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@/components/ui/tooltip"
+import apiClient from "@/api/client"
 import { LogOut, User, Shield, ChevronDown } from "lucide-react"
 
 export function AppHeader() {
   const navigate = useNavigate()
   const { users, currentUserId, logout } = useAuthStore()
   const currentUser = users.find((u) => u.id === currentUserId)
+  const [isOnline, setIsOnline] = useState(true)
+  const [lastHeartbeat, setLastHeartbeat] = useState<number>(Date.now())
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        await apiClient.get('/health')
+        setIsOnline(true)
+        setLastHeartbeat(Date.now())
+      } catch {
+        setIsOnline(false)
+      }
+    }
+    checkHealth()
+    const interval = setInterval(checkHealth, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -30,6 +55,22 @@ export function AppHeader() {
         <span className="text-sm font-medium text-muted-foreground truncate max-w-[120px] md:max-w-none">
           {currentUser?.spaceName || currentUser?.name || "未登录"}
         </span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger>
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${
+                  isOnline ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                }`}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              {isOnline
+                ? `连接正常 - 上次心跳: ${Math.round((Date.now() - lastHeartbeat) / 1000)}秒前`
+                : "连接断开"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <div className="flex items-center gap-2">
         <ThemeToggle />

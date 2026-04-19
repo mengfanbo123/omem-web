@@ -15,6 +15,7 @@ import {
   Lightbulb,
   BookOpen,
   Zap,
+  Lock,
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -22,6 +23,17 @@ interface ProfileData {
   dynamic_context: string[]
   search_results: string[] | null
   static_facts: string[]
+}
+
+interface MemoryItem {
+  id: string
+  content: string
+  tags: string[]
+}
+
+interface MemoriesResponse {
+  memories: MemoryItem[]
+  total_count: number
 }
 
 function classifyFact(fact: string): {
@@ -49,17 +61,34 @@ function formatFact(fact: string): string {
   return fact.replace(/^#+\s*/, "").trim()
 }
 
+function isPrivateByTags(tags: string[]): boolean {
+  return tags.some((t) => t === "私密" || t.toLowerCase() === "private")
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const [profile, setProfile] = useState<ProfileData | null>(null)
+  const [contentTagsMap, setContentTagsMap] = useState<Map<string, string[]>>(new Map())
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchProfile() {
+    async function fetchProfileData() {
       try {
         setLoading(true)
-        const data = await apiClient.get<ProfileData>("/v1/profile")
-        setProfile(data)
+        // 同时获取用户画像和记忆列表（带tags）
+        const [profileData, memoriesData] = await Promise.all([
+          apiClient.get<ProfileData>("/v1/profile"),
+          apiClient.get<MemoriesResponse>("/v1/memories", {
+            params: { limit: 200, offset: 0 },
+          }),
+        ])
+        setProfile(profileData)
+        // 建立 content -> tags 映射
+        const map = new Map<string, string[]>()
+        for (const mem of memoriesData.memories || []) {
+          map.set(mem.content, mem.tags || [])
+        }
+        setContentTagsMap(map)
       } catch (err) {
         console.error("Failed to fetch profile:", err)
         toast.error("加载用户画像失败")
@@ -68,7 +97,7 @@ export function ProfilePage() {
       }
     }
 
-    fetchProfile()
+    fetchProfileData()
   }, [])
 
   const staticFacts = profile?.static_facts || []
@@ -128,9 +157,13 @@ export function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {staticFacts.map((fact, index) => {
-                  const { type, icon: Icon, color } = classifyFact(fact)
+                  const tags = contentTagsMap.get(fact) || []
+                  const isPrivate = isPrivateByTags(tags)
+                  const { type, icon: Icon, color } = isPrivate
+                    ? { type: "private" as const, icon: Lock, color: "text-amber-500 bg-amber-500/10 border-amber-500/30" }
+                    : classifyFact(fact)
                   return (
-                    <div key={`sf-${index}`}>
+                    <div key={`sf-${fact.slice(0, 30)}`}>
                       {index > 0 && <Separator className="my-3" />}
                       <div className="flex items-start gap-3">
                         <div className={`shrink-0 mt-0.5 p-1 rounded-md ${color.split(" ").slice(1).join(" ")}`}>
@@ -138,9 +171,15 @@ export function ProfilePage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                              {formatFact(fact)}
-                            </ReactMarkdown>
+                            {isPrivate ? (
+                              <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                🔒 私密记忆 · 已加密
+                              </span>
+                            ) : (
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {formatFact(fact)}
+                              </ReactMarkdown>
+                            )}
                           </div>
                           <Badge variant="outline" className={`mt-1.5 text-[10px] ${color}`}>
                             {type === "fact" && "事实"}
@@ -148,6 +187,7 @@ export function ProfilePage() {
                             {type === "skill" && "技能"}
                             {type === "project" && "项目"}
                             {type === "note" && "笔记"}
+                            {type === "private" && "私密"}
                           </Badge>
                         </div>
                       </div>
@@ -171,7 +211,7 @@ export function ProfilePage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {dynamicContext.map((ctx, index) => (
-                  <div key={`dc-${index}`}>
+                  <div key={`dc-${ctx.slice(0, 30)}`}>
                     {index > 0 && <Separator className="my-3" />}
                     <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>

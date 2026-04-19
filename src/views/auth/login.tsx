@@ -50,6 +50,13 @@ export function LoginPage() {
         spaceName = spaces[0].name
       }
 
+      const existingUser = users.find((u) => u.apiKey === apiKey)
+      if (existingUser) {
+        setCurrentUser(existingUser.id)
+        navigate("/dashboard")
+        return
+      }
+
       const newUser = {
         id: crypto.randomUUID(),
         name: spaceName,
