@@ -343,7 +343,7 @@ export function SpacesPage() {
                       <UserPlus className="size-3.5 mr-1" />
                       管理成员
                     </Button>
-                    {!space.members.some((m) => m.user_id === currentUser?.apiKey) && (
+                    {space.owner_id === currentUser?.apiKey && (
                       <Button
                         variant="ghost"
                         size="icon"

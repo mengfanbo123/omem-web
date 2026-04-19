@@ -200,10 +200,10 @@ export function SessionDetailPage() {
         setLoading(true)
         setError(null)
 
-        const response = await apiClient.get<SessionRecall[]>("/v1/session-recalls", {
+        const data = await apiClient.get<{recalls: SessionRecall[]; limit: number; offset: number}>("/v1/session-recalls", {
           params: { session_id: sessionId },
         })
-        const list = (response || []).sort(
+        const list = (data?.recalls || []).sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
         setRecalls(list)

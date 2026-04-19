@@ -55,8 +55,8 @@ export function SessionListPage() {
       try {
         setLoading(true)
         setError(null)
-        const response = await apiClient.get<SessionRecall[]>("/v1/session-recalls")
-        setRecalls(response || [])
+        const data = await apiClient.get<{recalls: SessionRecall[]; limit: number; offset: number}>("/v1/session-recalls")
+        setRecalls(data?.recalls || [])
       } catch (err) {
         console.error("Failed to fetch session recalls:", err)
         setError("加载 Session 记忆注入记录失败")
