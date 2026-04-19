@@ -406,9 +406,9 @@ export function SpacesPage() {
                 {currentManageSpace?.members.map((m) => {
                   const info = memberInfos[m.user_id]
                   return (
-                    <div key={m.user_id} className="flex items-center gap-2 text-sm border rounded-md px-3 py-2 min-w-0">
-                      <User className="size-3.5 text-muted-foreground shrink-0" />
-                      <div className="min-w-0 flex-1">
+                    <div key={m.user_id} className="grid grid-cols-[auto_1fr_80px_60px] items-center gap-3 text-sm border rounded-md px-3 py-2">
+                      <User className="size-3.5 text-muted-foreground" />
+                      <div className="min-w-0">
                         <div className="font-mono text-xs truncate" title={m.user_id}>{m.user_id}</div>
                         {info && (
                           <div className="text-xs text-muted-foreground truncate">
@@ -416,7 +416,8 @@ export function SpacesPage() {
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <Badge variant="outline" className="justify-self-center">{m.role}</Badge>
+                      <div className="flex items-center gap-2 justify-self-end">
                         <button
                           type="button"
                           onClick={() => {
@@ -428,7 +429,6 @@ export function SpacesPage() {
                         >
                           <Copy className="size-3.5" />
                         </button>
-                        <Badge variant="outline">{m.role}</Badge>
                         {currentManageSpace && isSpaceAdmin(currentManageSpace) && m.user_id !== currentUser?.apiKey && (
                           <button
                             type="button"
