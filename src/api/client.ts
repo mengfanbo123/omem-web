@@ -16,6 +16,7 @@ apiClient.interceptors.request.use((config) => {
   )
   if (currentUser?.apiKey) {
     config.headers["X-API-Key"] = currentUser.apiKey
+    config.headers["X-Agent-ID"] = "omem-web"
   }
   return config
 })
