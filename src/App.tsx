@@ -6,6 +6,8 @@ import { MemoryListPage } from '@/views/memories/memory-list'
 import { MemoryDetailPage } from '@/views/memories/memory-detail'
 import { MemoryFormPage } from '@/views/memories/memory-form'
 import { VaultMemoriesPage } from '@/views/vault/vault-memories'
+import { SessionListPage } from '@/views/sessions/session-list'
+import { SessionDetailPage } from '@/views/sessions/session-detail'
 import { SpacesPage } from '@/views/spaces/spaces'
 import { AnalyticsPage } from '@/views/analytics/analytics'
 import { ImportPage } from '@/views/import/import-page'
@@ -42,6 +44,8 @@ function App() {
           <Route path="memories/:id/edit" element={<MemoryFormPage />} />
           <Route path="vault" element={<VaultMemoriesPage />} />
           <Route path="spaces" element={<SpacesPage />} />
+          <Route path="sessions" element={<SessionListPage />} />
+          <Route path="sessions/:id" element={<SessionDetailPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="import" element={<ImportPage />} />
           <Route path="profile" element={<ProfilePage />} />
