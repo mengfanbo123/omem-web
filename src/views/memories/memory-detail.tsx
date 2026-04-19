@@ -331,7 +331,7 @@ export function MemoryDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {showContent && (
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/memories/${id}/edit`)}>
+            <Button variant="ghost" size="sm" onClick={() => navigate(memory.memory_type === 'insight' ? `/memories/${id}/edit-insight` : `/memories/${id}/edit`)}>
               <Pencil className="size-3.5 mr-1.5" />
               编辑
             </Button>

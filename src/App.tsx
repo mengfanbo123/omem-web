@@ -5,6 +5,7 @@ import { DashboardPage } from '@/views/dashboard/dashboard'
 import { MemoryListPage } from '@/views/memories/memory-list'
 import { MemoryDetailPage } from '@/views/memories/memory-detail'
 import { MemoryFormPage } from '@/views/memories/memory-form'
+import { MemoryInsightFormPage } from '@/views/memories/memory-insight-form'
 import { VaultMemoriesPage } from '@/views/vault/vault-memories'
 import { SessionListPage } from '@/views/sessions/session-list'
 import { SessionDetailPage } from '@/views/sessions/session-detail'
@@ -42,6 +43,7 @@ function App() {
           <Route path="memories/:id" element={<MemoryDetailPage />} />
           <Route path="memories/new" element={<MemoryFormPage />} />
           <Route path="memories/:id/edit" element={<MemoryFormPage />} />
+          <Route path="memories/:id/edit-insight" element={<MemoryInsightFormPage />} />
           <Route path="vault" element={<VaultMemoriesPage />} />
           <Route path="spaces" element={<SpacesPage />} />
           <Route path="sessions" element={<SessionListPage />} />
