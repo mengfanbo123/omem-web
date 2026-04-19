@@ -60,7 +60,9 @@ export function AppHeader() {
             <TooltipTrigger>
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
-                  isOnline ? "bg-[#22c55e]" : "bg-[#ef4444]"
+                  isOnline
+                    ? "bg-[#22c55e] animate-pulse"
+                    : "bg-[#ef4444]"
                 }`}
               />
             </TooltipTrigger>
@@ -95,7 +97,7 @@ export function AppHeader() {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate("/profile")}>
               <User className="size-4 mr-2" />
-              个人中心
+              用户画像
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/settings")}>
               <Shield className="size-4 mr-2" />

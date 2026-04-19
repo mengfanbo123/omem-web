@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select"
 import apiClient from "@/api/client"
 import { toast } from "sonner"
-import { Users, Shield, Calendar, Plus, Trash2, UserPlus, User } from "lucide-react"
+import { Users, Shield, Calendar, Plus, Trash2, UserPlus, User, KeyRound, Copy, Check } from "lucide-react"
 
 interface Space {
   id: string
@@ -60,6 +60,12 @@ export function SpacesPage() {
   const [addingMember, setAddingMember] = useState(false)
   const [memberInfos, setMemberInfos] = useState<Record<string, { name: string; created_at: string }>>({})
   const [loadingMemberInfo, setLoadingMemberInfo] = useState(false)
+  const [createUserOpen, setCreateUserOpen] = useState(false)
+  const [newUserName, setNewUserName] = useState("")
+  const [newUserRole, setNewUserRole] = useState("member")
+  const [creatingUser, setCreatingUser] = useState(false)
+  const [generatedKey, setGeneratedKey] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const currentManageSpace = spaces.find((s) => s.id === manageSpaceId)
 
@@ -136,6 +142,35 @@ export function SpacesPage() {
       toast.error("空间删除失败")
     } finally {
       setDeleteTarget(null)
+    }
+  }
+
+  async function createUserAndAdd() {
+    if (!manageSpaceId) return
+    setCreatingUser(true)
+    try {
+      const res = await apiClient.post<{ id: string; api_key: string; status: string }>(
+        '/v1/tenants',
+        { name: newUserName.trim() || undefined }
+      )
+      const userId = res.id
+      const apiKey = res.api_key
+
+      await apiClient.post(`/v1/spaces/${encodeURIComponent(manageSpaceId)}/members`, {
+        user_id: userId,
+        role: newUserRole,
+      })
+
+      setGeneratedKey(apiKey)
+      toast.success("新用户创建并加入空间成功")
+      const response = await apiClient.get<Space[]>('/v1/spaces')
+      setSpaces(response || [])
+    } catch (err: any) {
+      console.error("Failed to create user:", err)
+      const msg = err.response?.data?.error || err.message || ""
+      toast.error(`创建用户失败：${msg || "请稍后重试"}`)
+    } finally {
+      setCreatingUser(false)
     }
   }
 
@@ -359,29 +394,117 @@ export function SpacesPage() {
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <span className="text-sm font-medium">添加成员</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="输入对方 API Key（UUID格式）"
-                  value={newMemberId}
-                  onChange={(e) => setNewMemberId(e.target.value)}
-                  className="flex-1"
-                />
-                <Select value={newMemberRole} onValueChange={(v) => setNewMemberRole(v || 'member')}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">管理员</SelectItem>
-                    <SelectItem value="member">成员</SelectItem>
-                    <SelectItem value="reader">只读</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={addMember} disabled={addingMember}>
-                  {addingMember ? "添加中..." : "添加"}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">添加成员</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCreateUserOpen(true)
+                    setGeneratedKey(null)
+                    setNewUserName("")
+                    setNewUserRole("member")
+                  }}
+                >
+                  <KeyRound className="size-3.5 mr-1.5" />
+                  创建新用户
                 </Button>
               </div>
+
+              {createUserOpen && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">创建新用户</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreateUserOpen(false)
+                        setGeneratedKey(null)
+                      }}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      取消
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="用户名（可选）"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v || 'member')}>
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">管理员</SelectItem>
+                        <SelectItem value="member">成员</SelectItem>
+                        <SelectItem value="reader">只读</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={createUserAndAdd}
+                    disabled={creatingUser}
+                  >
+                    {creatingUser ? "生成中..." : "生成用户并添加到空间"}
+                  </Button>
+
+                  {generatedKey && (
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">新用户 API Key（请复制保存）：</div>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 text-xs bg-background border rounded px-2 py-1.5 font-mono truncate">
+                          {generatedKey}
+                        </code>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedKey)
+                            setCopied(true)
+                            setTimeout(() => setCopied(false), 2000)
+                          }}
+                        >
+                          {copied ? (
+                            <Check className="size-3.5" />
+                          ) : (
+                            <Copy className="size-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!createUserOpen && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="输入对方 API Key（UUID格式）"
+                    value={newMemberId}
+                    onChange={(e) => setNewMemberId(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Select value={newMemberRole} onValueChange={(v) => setNewMemberRole(v || 'member')}>
+                    <SelectTrigger className="w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">管理员</SelectItem>
+                      <SelectItem value="member">成员</SelectItem>
+                      <SelectItem value="reader">只读</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" onClick={addMember} disabled={addingMember}>
+                    {addingMember ? "添加中..." : "添加"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </DialogContent>

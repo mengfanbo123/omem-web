@@ -45,7 +45,10 @@ export function LoginPage() {
 
       let spaceName = "默认空间"
       const spacesRes = await client.get("/v1/spaces")
-      const spaces = spacesRes.data?.spaces || []
+      const spacesData = spacesRes.data
+      const spaces = Array.isArray(spacesData)
+        ? spacesData
+        : spacesData?.spaces || []
       if (spaces.length > 0 && spaces[0].name) {
         spaceName = spaces[0].name
       }

@@ -17,7 +17,7 @@ const navItems = [
   { icon: Home, label: "空间管理", path: "/spaces" },
   { icon: BarChart3, label: "统计分析", path: "/analytics" },
   { icon: Import, label: "批量导入", path: "/import" },
-  { icon: User, label: "个人中心", path: "/profile" },
+  { icon: User, label: "用户画像", path: "/profile" },
   { icon: Settings, label: "系统设置", path: "/settings" },
 ]
 
