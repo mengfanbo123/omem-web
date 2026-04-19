@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import apiClient from "@/api/client"
+import { useAuthStore } from "@/stores/auth"
 import { toast } from "sonner"
 import { Users, Shield, Calendar, Plus, Trash2, UserPlus, User, KeyRound, Copy, Check } from "lucide-react"
 
@@ -67,7 +68,16 @@ export function SpacesPage() {
   const [generatedKey, setGeneratedKey] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const currentUserId = useAuthStore((s) => s.currentUserId)
+  const currentUser = useAuthStore((s) => s.users.find((u) => u.id === currentUserId))
   const currentManageSpace = spaces.find((s) => s.id === manageSpaceId)
+
+  const isSpaceAdmin = (space: Space) => {
+    if (!currentUser) return false
+    return space.owner_id === currentUser.apiKey || space.members.some(
+      (m) => m.user_id === currentUser.apiKey && (m.role === "admin" || m.role === "Admin")
+    )
+  }
 
   useEffect(() => {
     async function fetchMemberInfos() {
@@ -310,14 +320,16 @@ export function SpacesPage() {
                       <UserPlus className="size-3.5 mr-1" />
                       管理成员
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setDeleteTarget(space.id)}
-                    >
-                      <Trash2 className="size-3.5 text-destructive" />
-                    </Button>
+                    {isSpaceAdmin(space) && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => setDeleteTarget(space.id)}
+                      >
+                        <Trash2 className="size-3.5 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>

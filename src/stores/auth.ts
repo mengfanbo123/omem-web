@@ -53,15 +53,14 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: newUsers.length > 0,
           }
         }),
-      logout: () =>
-        set(() => {
-          // 清理所有敏感数据
-          sessionStorage.removeItem("omem-auth")
-          return {
-            currentUserId: null,
-            isAuthenticated: false,
-          }
-        }),
+      logout: () => {
+        sessionStorage.removeItem("omem-auth")
+        set({
+          users: [],
+          currentUserId: null,
+          isAuthenticated: false,
+        })
+      },
     }),
     {
       name: "omem-auth",
