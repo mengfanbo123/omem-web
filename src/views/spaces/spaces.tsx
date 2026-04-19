@@ -392,7 +392,7 @@ export function SpacesPage() {
       </AlertDialog>
 
       <Dialog open={!!manageSpaceId} onOpenChange={(open) => !open && setManageSpaceId(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>管理成员 - {currentManageSpace?.name}</DialogTitle>
           </DialogHeader>
@@ -406,7 +406,7 @@ export function SpacesPage() {
                 {currentManageSpace?.members.map((m) => {
                   const info = memberInfos[m.user_id]
                   return (
-                    <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2 gap-2">
+                    <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2 gap-2 overflow-hidden">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <User className="size-3.5 text-muted-foreground shrink-0" />
                         <div className="min-w-0 flex-1">
