@@ -72,7 +72,6 @@ export const useAuthStore = create<AuthState>()(
       logout: () => {
         sessionStorage.removeItem("omem-auth")
         set({
-          users: [],
           currentUserId: null,
           isAuthenticated: false,
         })
