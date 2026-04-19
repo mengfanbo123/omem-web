@@ -461,7 +461,9 @@ export function ProfilePage() {
                           {meta.label}
                         </Badge>
                       </div>
-                      <ExpandableMarkdown content={displayContent} />
+                      <div className={isPrivate && !unlockedFacts.has(fact) ? "blur-[6px] select-none opacity-50" : ""}>
+                        <ExpandableMarkdown content={displayContent} />
+                      </div>
                       {isPrivate && !unlockedFacts.has(fact) && unlockingFact === fact && (
                         <div className="mt-4 space-y-2">
                           <div className="flex items-center gap-2">
