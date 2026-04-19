@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import apiClient from "@/api/client"
+import { useAuthStore } from "@/stores/auth"
 import {
   BarChart,
   Bar,
@@ -123,6 +124,9 @@ export function DashboardPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { users, currentUserId } = useAuthStore()
+  const currentUser = users.find((u) => u.id === currentUserId)
+  const spaceName = currentUser?.spaceName || "默认"
 
   useEffect(() => {
     async function fetchStats() {
@@ -198,9 +202,9 @@ export function DashboardPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">仪表盘</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{spaceName}空间的记忆库状态</h1>
         <p className="text-muted-foreground">
-          概览您的记忆库状态
+          概览当前空间的记忆数据
         </p>
       </div>
 
