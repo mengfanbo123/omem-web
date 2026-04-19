@@ -18,6 +18,7 @@ interface AuthState {
   addUser: (user: User) => void
   setCurrentUser: (id: string) => void
   removeUser: (id: string) => void
+  removeUsersByApiKeys: (apiKeys: string[]) => void
   logout: () => void
 }
 
@@ -43,6 +44,21 @@ export const useAuthStore = create<AuthState>()(
           const newUsers = state.users.filter((u) => u.id !== id)
           const newCurrentId =
             state.currentUserId === id
+              ? newUsers.length > 0
+                ? newUsers[0].id
+                : null
+              : state.currentUserId
+          return {
+            users: newUsers,
+            currentUserId: newCurrentId,
+            isAuthenticated: newUsers.length > 0,
+          }
+        }),
+      removeUsersByApiKeys: (apiKeys: string[]) =>
+        set((state) => {
+          const newUsers = state.users.filter((u) => !apiKeys.includes(u.apiKey))
+          const newCurrentId =
+            state.currentUserId && !newUsers.some((u) => u.id === state.currentUserId)
               ? newUsers.length > 0
                 ? newUsers[0].id
                 : null

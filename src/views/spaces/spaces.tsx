@@ -143,10 +143,17 @@ export function SpacesPage() {
 
   async function confirmDeleteSpace() {
     if (!deleteTarget) return
+    const space = spaces.find((s) => s.id === deleteTarget)
+    const memberApiKeys = space?.members.map((m) => m.user_id) || []
     try {
       await apiClient.delete(`/v1/spaces/${encodeURIComponent(deleteTarget)}`)
       toast.success("空间已删除")
       setSpaces((prev) => prev.filter((s) => s.id !== deleteTarget))
+      useAuthStore.getState().removeUsersByApiKeys(memberApiKeys)
+      const currentRemoved = memberApiKeys.includes(currentUser?.apiKey || "")
+      if (currentRemoved) {
+        window.location.href = "/login"
+      }
     } catch (err) {
       console.error("Failed to delete space:", err)
       toast.error("空间删除失败")
@@ -181,6 +188,20 @@ export function SpacesPage() {
       toast.error(`创建用户失败：${msg || "请稍后重试"}`)
     } finally {
       setCreatingUser(false)
+    }
+  }
+
+  async function removeMember(userId: string) {
+    if (!manageSpaceId) return
+    try {
+      await apiClient.delete(`/v1/spaces/${encodeURIComponent(manageSpaceId)}/members/${encodeURIComponent(userId)}`)
+      toast.success("成员已移除")
+      const response = await apiClient.get<Space[]>('/v1/spaces')
+      setSpaces(response || [])
+    } catch (err: any) {
+      console.error("Failed to remove member:", err)
+      const msg = err.response?.data?.error || err.message || ""
+      toast.error(`移除成员失败：${msg || "请稍后重试"}`)
     }
   }
 
@@ -385,11 +406,24 @@ export function SpacesPage() {
                 {currentManageSpace?.members.map((m) => {
                   const info = memberInfos[m.user_id]
                   return (
-                    <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2 gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
                         <User className="size-3.5 text-muted-foreground shrink-0" />
-                        <div className="min-w-0">
-                          <div className="font-mono text-xs truncate" title={m.user_id}>{m.user_id}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <div className="font-mono text-xs truncate flex-1" title={m.user_id}>{m.user_id}</div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(m.user_id)
+                                toast.success("API Key 已复制")
+                              }}
+                              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                              title="复制 API Key"
+                            >
+                              <Copy className="size-3" />
+                            </button>
+                          </div>
                           {info && (
                             <div className="text-xs text-muted-foreground">
                               {info.name} · {new Date(info.created_at).toLocaleDateString('zh-CN')}
@@ -397,7 +431,19 @@ export function SpacesPage() {
                           )}
                         </div>
                       </div>
-                      <Badge variant="outline">{m.role}</Badge>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge variant="outline">{m.role}</Badge>
+                        {currentManageSpace && isSpaceAdmin(currentManageSpace) && m.user_id !== currentUser?.apiKey && (
+                          <button
+                            type="button"
+                            onClick={() => removeMember(m.user_id)}
+                            className="text-muted-foreground hover:text-destructive transition-colors"
+                            title="移除成员"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}
