@@ -144,16 +144,14 @@ export function SpacesPage() {
   async function confirmDeleteSpace() {
     if (!deleteTarget) return
     const space = spaces.find((s) => s.id === deleteTarget)
-    const memberApiKeys = space?.members.map((m) => m.user_id) || []
+    const memberApiKeys = space?.members
+      .map((m) => m.user_id)
+      .filter((key) => key !== currentUser?.apiKey) || []
     try {
       await apiClient.delete(`/v1/spaces/${encodeURIComponent(deleteTarget)}`)
       toast.success("空间已删除")
       setSpaces((prev) => prev.filter((s) => s.id !== deleteTarget))
       useAuthStore.getState().removeUsersByApiKeys(memberApiKeys)
-      const currentRemoved = memberApiKeys.includes(currentUser?.apiKey || "")
-      if (currentRemoved) {
-        window.location.href = "/login"
-      }
     } catch (err) {
       console.error("Failed to delete space:", err)
       toast.error("空间删除失败")
