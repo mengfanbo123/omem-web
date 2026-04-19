@@ -75,7 +75,7 @@ function formatDate(dateString: string) {
 function VaultUnlock() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const isFirstTime = !useVaultStore.getState().passwordHash
+  const isFirstTime = !useVaultStore.getState().hasPassword
   const unlock = useVaultStore((s) => s.unlock)
 
   const handleSubmit = async () => {

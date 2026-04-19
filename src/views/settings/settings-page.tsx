@@ -21,7 +21,7 @@ import apiClient from "@/api/client"
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
-  const { passwordHash, setPassword, lock } = useVaultStore()
+  const { hasPassword, setPassword, lock } = useVaultStore()
   const [newPassword, setNewPassword] = useState("")
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [exportingMemories, setExportingMemories] = useState(false)
@@ -34,12 +34,16 @@ export function SettingsPage() {
     })
   }
 
-  const handleResetVault = () => {
-    lock()
-    sessionStorage.removeItem("omem-vault-hash")
-    toast.success("Vault 已重置")
-    setShowPasswordForm(false)
-    setResetDialogOpen(false)
+  const handleResetVault = async () => {
+    try {
+      await apiClient.delete("/v1/vault/password")
+      lock()
+      toast.success("Vault 已重置")
+      setShowPasswordForm(false)
+      setResetDialogOpen(false)
+    } catch {
+      toast.error("重置 Vault 失败")
+    }
   }
 
   const handleSetVaultPassword = () => {
@@ -56,7 +60,7 @@ export function SettingsPage() {
   const handleExportConfig = () => {
     const data = {
       auth: JSON.parse(sessionStorage.getItem("omem-auth") || "{}"),
-      vault: sessionStorage.getItem("omem-vault-hash") || null,
+      vault: "已迁移到服务端存储",
       theme: localStorage.getItem("omem-theme") || "system",
       exportedAt: new Date().toISOString(),
     }
@@ -151,7 +155,7 @@ export function SettingsPage() {
       <Card className="p-6">
         <h3 className="font-semibold mb-4">私密空间 Vault</h3>
         <div className="space-y-4">
-          {passwordHash ? (
+          {hasPassword ? (
             <>
               <p className="text-sm text-muted-foreground">
                 Vault 密码已设置。私密记忆需要输入密码才能查看。

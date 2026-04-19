@@ -56,7 +56,6 @@ export const useAuthStore = create<AuthState>()(
         set(() => {
           // 清理所有敏感数据
           sessionStorage.removeItem("omem-auth")
-          sessionStorage.removeItem("omem-vault-hash")
           return {
             currentUserId: null,
             isAuthenticated: false,

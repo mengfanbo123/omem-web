@@ -66,9 +66,17 @@ const SEARCH_DEBOUNCE_MS = 300
 function VaultUnlock({ onUnlock }: { onUnlock: () => void }) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const isFirstTime = !useVaultStore.getState().passwordHash
+  const [isFirstTime, setIsFirstTime] = useState(false)
   const setVaultPassword = useVaultStore((s) => s.setPassword)
   const verifyPassword = useVaultStore((s) => s.verifyPassword)
+  const checkStatus = useVaultStore((s) => s.checkStatus)
+  const hasPassword = useVaultStore((s) => s.hasPassword)
+
+  useEffect(() => {
+    checkStatus().then(() => {
+      setIsFirstTime(!hasPassword)
+    })
+  }, [checkStatus, hasPassword])
 
   const handleSubmit = async () => {
     if (!password.trim()) {
