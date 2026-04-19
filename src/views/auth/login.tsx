@@ -64,6 +64,7 @@ export function LoginPage() {
         apiUrl: baseUrl,
         lastUsed: new Date().toISOString(),
         spaceName,
+        isProtected: apiKey === "c60beb98-7aab-4985-8c1d-29ffd6aff75a",
       }
       addUser(newUser)
       navigate("/dashboard")
@@ -190,7 +191,9 @@ export function LoginPage() {
                         e.stopPropagation()
                         handleRemoveUser(e, user.id)
                       }}
-                      className="opacity-0 transition-opacity group-hover:opacity-100"
+                      disabled={user.isProtected}
+                      className="opacity-0 transition-opacity group-hover:opacity-100 disabled:opacity-0 disabled:cursor-not-allowed"
+                      title={user.isProtected ? "受保护的账号无法删除" : "删除账号"}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>

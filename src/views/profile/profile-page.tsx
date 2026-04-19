@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Separator } from "@/components/ui/separator"
+import { Input } from "@/components/ui/input"
 import apiClient from "@/api/client"
+import { useVaultStore } from "@/stores/vault"
 import {
   ArrowLeft,
   User,
@@ -70,6 +72,12 @@ export function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [contentTagsMap, setContentTagsMap] = useState<Map<string, string[]>>(new Map())
   const [loading, setLoading] = useState(true)
+  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
+  const vaultUnlock = useVaultStore((s) => s.unlock)
+  const vaultHasPassword = useVaultStore((s) => s.hasPassword)
+  const [unlockingFact, setUnlockingFact] = useState<string | null>(null)
+  const [unlockPassword, setUnlockPassword] = useState("")
+  const [unlockError, setUnlockError] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchProfileData() {
@@ -99,6 +107,32 @@ export function ProfilePage() {
 
     fetchProfileData()
   }, [])
+
+  const handleFactClick = (fact: string) => {
+    if (vaultUnlocked) return
+    if (!vaultHasPassword) {
+      toast.error("您还没设置密码，请先设置密码")
+      return
+    }
+    setUnlockingFact(fact)
+    setUnlockPassword("")
+    setUnlockError(null)
+  }
+
+  const handleUnlockSubmit = async () => {
+    if (!unlockPassword.trim()) {
+      setUnlockError("请输入密码")
+      return
+    }
+    const success = await vaultUnlock(unlockPassword)
+    if (!success) {
+      setUnlockError("密码错误")
+      return
+    }
+    setUnlockingFact(null)
+    setUnlockPassword("")
+    setUnlockError(null)
+  }
 
   const staticFacts = profile?.static_facts || []
   const dynamicContext = profile?.dynamic_context || []
@@ -172,9 +206,42 @@ export function ProfilePage() {
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-foreground prose prose-sm dark:prose-invert max-w-none">
                             {isPrivate ? (
-                              <span className="text-amber-600 dark:text-amber-400 font-medium">
-                                🔒 私密记忆 · 已加密
-                              </span>
+                              vaultUnlocked ? (
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {formatFact(fact)}
+                                </ReactMarkdown>
+                              ) : (
+                                <div className="space-y-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleFactClick(fact)}
+                                    className="text-amber-600 dark:text-amber-400 font-medium cursor-pointer hover:underline bg-transparent border-none p-0"
+                                  >
+                                    🔒 私密记忆 · 已加密（点击解锁）
+                                  </button>
+                                  {unlockingFact === fact && (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="password"
+                                        placeholder="输入 Vault 密码..."
+                                        value={unlockPassword}
+                                        onChange={(e) => {
+                                          setUnlockPassword(e.target.value)
+                                          setUnlockError(null)
+                                        }}
+                                        onKeyDown={(e) => e.key === "Enter" && handleUnlockSubmit()}
+                                        className={unlockError ? "border-destructive max-w-xs" : "max-w-xs"}
+                                      />
+                                      <Button size="sm" onClick={handleUnlockSubmit}>
+                                        解锁
+                                      </Button>
+                                    </div>
+                                  )}
+                                  {unlockingFact === fact && unlockError && (
+                                    <p className="text-xs text-destructive">{unlockError}</p>
+                                  )}
+                                </div>
+                              )
                             ) : (
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {formatFact(fact)}

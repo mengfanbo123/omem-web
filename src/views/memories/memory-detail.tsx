@@ -75,12 +75,16 @@ function formatDate(dateString: string) {
 function VaultUnlock() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const isFirstTime = !useVaultStore.getState().hasPassword
+  const hasPassword = useVaultStore((s) => s.hasPassword)
   const unlock = useVaultStore((s) => s.unlock)
 
   const handleSubmit = async () => {
     if (!password.trim()) {
       setError("请输入密码")
+      return
+    }
+    if (!hasPassword) {
+      setError("您还没设置密码，请先设置密码")
       return
     }
     const success = await unlock(password)
@@ -93,17 +97,17 @@ function VaultUnlock() {
     <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-8 text-center space-y-4">
       <Lock className="h-10 w-10 text-amber-500 mx-auto" />
       <h3 className="text-lg font-semibold text-amber-500">
-        {isFirstTime ? "设置 Vault 密码" : "Vault 已锁定"}
+        {hasPassword ? "Vault 已锁定" : "无法解锁"}
       </h3>
       <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-        {isFirstTime
-          ? "首次查看私密记忆，请设置 Vault 密码"
-          : "此记忆已加密，请输入 Vault 密码查看"}
+        {hasPassword
+          ? "此记忆已加密，请输入 Vault 密码查看"
+          : "您尚未设置 Vault 密码，请先前往设置"}
       </p>
       <div className="flex items-center gap-2 max-w-xs mx-auto">
         <Input
           type="password"
-          placeholder={isFirstTime ? "设置密码..." : "输入密码..."}
+          placeholder={hasPassword ? "输入密码..." : "请先设置密码..."}
           value={password}
           onChange={(e) => {
             setPassword(e.target.value)
@@ -111,9 +115,10 @@ function VaultUnlock() {
           }}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           className={error ? "border-destructive" : ""}
+          disabled={!hasPassword}
         />
-        <Button size="sm" onClick={handleSubmit}>
-          {isFirstTime ? "设置" : "解锁"}
+        <Button size="sm" onClick={handleSubmit} disabled={!hasPassword}>
+          解锁
         </Button>
       </div>
       {error && (

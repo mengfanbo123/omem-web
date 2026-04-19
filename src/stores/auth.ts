@@ -8,6 +8,7 @@ export interface User {
   apiUrl: string
   lastUsed: string
   spaceName?: string
+  isProtected?: boolean
 }
 
 interface AuthState {

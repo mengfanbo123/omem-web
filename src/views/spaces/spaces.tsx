@@ -58,8 +58,35 @@ export function SpacesPage() {
   const [newMemberId, setNewMemberId] = useState("")
   const [newMemberRole, setNewMemberRole] = useState("member")
   const [addingMember, setAddingMember] = useState(false)
+  const [memberInfos, setMemberInfos] = useState<Record<string, { name: string; created_at: string }>>({})
+  const [loadingMemberInfo, setLoadingMemberInfo] = useState(false)
 
   const currentManageSpace = spaces.find((s) => s.id === manageSpaceId)
+
+  useEffect(() => {
+    async function fetchMemberInfos() {
+      if (!currentManageSpace?.members?.length) return
+      setLoadingMemberInfo(true)
+      const infos: Record<string, { name: string; created_at: string }> = {}
+      await Promise.all(
+        currentManageSpace.members.map(async (m) => {
+          try {
+            const res = await apiClient.get<{ id: string; name: string; created_at: string }>(
+              `/v1/tenants/${encodeURIComponent(m.user_id)}`
+            )
+            if (res) infos[m.user_id] = { name: res.name, created_at: res.created_at }
+          } catch {
+            void 0
+          }
+        })
+      )
+      setMemberInfos(infos)
+      setLoadingMemberInfo(false)
+    }
+    if (manageSpaceId) {
+      fetchMemberInfos()
+    }
+  }, [manageSpaceId, currentManageSpace?.members])
 
   useEffect(() => {
     async function fetchSpaces() {
@@ -304,16 +331,29 @@ export function SpacesPage() {
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <span className="text-sm font-medium">当前成员</span>
+              {loadingMemberInfo && (
+                <div className="text-xs text-muted-foreground">加载用户信息中...</div>
+              )}
               <div className="space-y-1">
-                {currentManageSpace?.members.map((m) => (
-                  <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <User className="size-3.5 text-muted-foreground" />
-                      <span className="font-mono text-xs">{m.user_id}</span>
+                {currentManageSpace?.members.map((m) => {
+                  const info = memberInfos[m.user_id]
+                  return (
+                    <div key={m.user_id} className="flex items-center justify-between text-sm border rounded-md px-3 py-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <User className="size-3.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-mono text-xs truncate" title={m.user_id}>{m.user_id}</div>
+                          {info && (
+                            <div className="text-xs text-muted-foreground">
+                              {info.name} · {new Date(info.created_at).toLocaleDateString('zh-CN')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Badge variant="outline">{m.role}</Badge>
                     </div>
-                    <Badge variant="outline">{m.role}</Badge>
-                  </div>
-                ))}
+                  )
+                })}
                 {(!currentManageSpace?.members || currentManageSpace.members.length === 0) && (
                   <p className="text-sm text-muted-foreground">暂无成员</p>
                 )}

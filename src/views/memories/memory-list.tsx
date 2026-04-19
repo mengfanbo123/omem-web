@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -114,11 +114,19 @@ function PrivateContent({ memory, unlocked }: { memory: MemoryItem; unlocked: bo
 
 export function MemoryListPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const getParam = (key: string, defaultValue: string) => searchParams.get(key) || defaultValue
+  const getNumParam = (key: string, defaultValue: number) => {
+    const v = searchParams.get(key)
+    return v ? parseInt(v, 10) : defaultValue
+  }
+
   const [memories, setMemories] = useState<MemoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [page, setPage] = useState(getNumParam("page", 1))
+  const [searchQuery, setSearchQuery] = useState(getParam("q", ""))
   const [totalCount, setTotalCount] = useState(0)
   const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
   const vaultLock = useVaultStore((s) => s.lock)
@@ -126,13 +134,13 @@ export function MemoryListPage() {
   const [showVaultInput, setShowVaultInput] = useState(false)
   const [vaultPassword, setVaultPassword] = useState("")
   const [vaultError, setVaultError] = useState<string | null>(null)
-  const [tierFilter, setTierFilter] = useState<string>("all")
-  const [sortBy, setSortBy] = useState<string>("created_at")
-  const [pageSize, setPageSize] = useState<number>(20)
+  const [tierFilter, setTierFilter] = useState(getParam("tier", "all"))
+  const [sortBy, setSortBy] = useState(getParam("sort", "created_at"))
+  const [pageSize, setPageSize] = useState(getNumParam("size", 20))
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'global' | 'private'>("all")
-  const [debouncedQuery, setDebouncedQuery] = useState("")
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'global' | 'private'>(getParam("privacy", "all") as 'all' | 'global' | 'private')
+  const [debouncedQuery, setDebouncedQuery] = useState(getParam("q", ""))
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -199,6 +207,17 @@ export function MemoryListPage() {
 
     loadMemories()
   }, [page, debouncedQuery, tierFilter, sortBy, pageSize, visibilityFilter])
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (page > 1) params.set("page", String(page))
+    if (searchQuery) params.set("q", searchQuery)
+    if (tierFilter !== "all") params.set("tier", tierFilter)
+    if (sortBy !== "created_at") params.set("sort", sortBy)
+    if (pageSize !== 20) params.set("size", String(pageSize))
+    if (visibilityFilter !== "all") params.set("privacy", visibilityFilter)
+    setSearchParams(params, { replace: true })
+  }, [page, searchQuery, tierFilter, sortBy, pageSize, visibilityFilter, setSearchParams])
 
   const handleRowClick = (id: string) => {
     navigate(`/memories/${id}`)
