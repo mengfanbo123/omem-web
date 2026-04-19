@@ -144,9 +144,7 @@ export function SpacesPage() {
   async function confirmDeleteSpace() {
     if (!deleteTarget) return
     const space = spaces.find((s) => s.id === deleteTarget)
-    const memberApiKeys = space?.members
-      .map((m) => m.user_id)
-      .filter((key) => key !== currentUser?.apiKey) || []
+    const memberApiKeys = space?.members.map((m) => m.user_id) || []
     try {
       await apiClient.delete(`/v1/spaces/${encodeURIComponent(deleteTarget)}`)
       toast.success("空间已删除")
@@ -343,7 +341,7 @@ export function SpacesPage() {
                       <UserPlus className="size-3.5 mr-1" />
                       管理成员
                     </Button>
-                    {space.owner_id === currentUser?.apiKey && (
+                    {space.space_type !== 'personal' && isSpaceAdmin(space) && (
                       <Button
                         variant="ghost"
                         size="icon"
