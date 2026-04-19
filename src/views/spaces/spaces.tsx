@@ -392,7 +392,7 @@ export function SpacesPage() {
       </AlertDialog>
 
       <Dialog open={!!manageSpaceId} onOpenChange={(open) => !open && setManageSpaceId(null)}>
-        <DialogContent className="max-w-xl w-[90vw]">
+        <DialogContent style={{ width: 680, maxWidth: '95vw' }}>
           <DialogHeader>
             <DialogTitle>管理成员 - {currentManageSpace?.name}</DialogTitle>
           </DialogHeader>
