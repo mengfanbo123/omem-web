@@ -178,12 +178,12 @@ export function ProfilePage() {
     new Map()
   )
   const [loading, setLoading] = useState(true)
-  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
   const vaultUnlock = useVaultStore((s) => s.unlock)
   const vaultHasPassword = useVaultStore((s) => s.hasPassword)
   const [unlockingFact, setUnlockingFact] = useState<string | null>(null)
   const [unlockPassword, setUnlockPassword] = useState("")
   const [unlockError, setUnlockError] = useState<string | null>(null)
+  const [unlockedFacts, setUnlockedFacts] = useState<Set<string>>(new Set())
   const [activeCategory, setActiveCategory] = useState<string>("全部")
 
   useEffect(() => {
@@ -214,7 +214,7 @@ export function ProfilePage() {
   }, [])
 
   const handleFactClick = (fact: string) => {
-    if (vaultUnlocked) return
+    if (unlockedFacts.has(fact)) return
     if (!vaultHasPassword) {
       toast.error("您还没设置密码，请先设置密码")
       return
@@ -233,6 +233,9 @@ export function ProfilePage() {
     if (!success) {
       setUnlockError("密码错误")
       return
+    }
+    if (unlockingFact) {
+      setUnlockedFacts((prev) => new Set(prev).add(unlockingFact))
     }
     setUnlockingFact(null)
     setUnlockPassword("")
@@ -296,8 +299,11 @@ export function ProfilePage() {
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
               用户画像
             </h1>
-            <p className="text-slate-300 text-sm md:text-base mb-6">
-              从您的记忆库中自动提取的持久信息
+            <p className="text-slate-300 text-sm md:text-base mb-2">
+              🧠 AI 构建的用户画像
+            </p>
+            <p className="text-slate-400 text-xs md:text-sm mb-6 max-w-xl">
+              ✨ 以下内容是从您的记忆库中自动提取的关于您的持久信息。随着您存储更多记忆，画像会越来越丰富和准确。
             </p>
             <div className="flex flex-wrap gap-3">
               {[
@@ -356,7 +362,7 @@ export function ProfilePage() {
           ))}
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {CATEGORIES.map((cat) => {
             const isActive = activeCategory === cat.key
             return (
@@ -376,6 +382,17 @@ export function ProfilePage() {
               </Button>
             )
           })}
+          {unlockedFacts.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full text-amber-600 border-amber-300 hover:bg-amber-50 hover:text-amber-700"
+              onClick={() => setUnlockedFacts(new Set())}
+            >
+              <Lock className="size-3.5 mr-1.5" />
+              重新锁定
+            </Button>
+          )}
         </div>
       )}
 
@@ -402,7 +419,7 @@ export function ProfilePage() {
               {filteredFacts.map(({ fact, memory, isPrivate, meta }) => {
                 const Icon = meta.icon
                 const displayContent =
-                  isPrivate && vaultUnlocked
+                  isPrivate && unlockedFacts.has(fact)
                     ? memory?.l2_content || formatFact(fact)
                     : formatFact(fact)
 
@@ -411,7 +428,7 @@ export function ProfilePage() {
                     key={`sf-${fact.slice(0, 40)}`}
                     className="relative overflow-hidden transition-all hover:shadow-md"
                   >
-                    {isPrivate && !vaultUnlocked && unlockingFact !== fact && (
+                    {isPrivate && !unlockedFacts.has(fact) && unlockingFact !== fact && (
                       <button
                         type="button"
                         className="absolute inset-0 backdrop-blur-md bg-white/40 dark:bg-black/40 rounded-lg flex flex-col items-center justify-center gap-2 z-10 cursor-pointer hover:bg-white/50 dark:hover:bg-black/50 transition-colors border-none"
@@ -445,7 +462,7 @@ export function ProfilePage() {
                         </Badge>
                       </div>
                       <ExpandableMarkdown content={displayContent} />
-                      {isPrivate && !vaultUnlocked && unlockingFact === fact && (
+                      {isPrivate && !unlockedFacts.has(fact) && unlockingFact === fact && (
                         <div className="mt-4 space-y-2">
                           <div className="flex items-center gap-2">
                             <Input
@@ -491,30 +508,52 @@ export function ProfilePage() {
           )}
 
           {dynamicContext.length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-lg font-semibold tracking-tight mb-4 flex items-center gap-2">
-                <Clock className="size-5 text-muted-foreground" />
-                动态上下文
-              </h2>
-              <div className="relative pl-6 space-y-6">
-                <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
-                {dynamicContext.map((ctx) => (
-                  <div
-                    key={`dc-${ctx.slice(0, 50)}`}
-                    className="relative"
-                  >
-                    <div className="absolute -left-6 top-1.5 w-2 h-2 rounded-full bg-primary ring-4 ring-background" />
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {ctx}
-                          </ReactMarkdown>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ))}
+            <div className="mt-10">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                  <Clock className="size-5 text-indigo-500" />
+                  动态上下文
+                </h2>
+                <Badge variant="secondary" className="text-xs">
+                  {dynamicContext.length} 条记录
+                </Badge>
+              </div>
+              <div className="relative pl-8 space-y-5">
+                <div className="absolute left-3 top-3 bottom-3 w-0.5 bg-gradient-to-b from-indigo-500 via-violet-400 to-transparent rounded-full" />
+                {dynamicContext.map((ctx, index) => {
+                  const ctxMeta = classifyFact(ctx)
+                  const CtxIcon = ctxMeta.icon
+                  return (
+                    <div
+                      key={`dc-${ctx.slice(0, 50)}`}
+                      className="relative group"
+                    >
+                      <div className="absolute -left-8 top-2 w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 ring-4 ring-background flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+                        <span className="text-[10px] font-bold text-white">
+                          {index + 1}
+                        </span>
+                      </div>
+                      <Card className="overflow-hidden border-l-4 border-l-indigo-400 hover:shadow-md transition-shadow">
+                        <CardContent className="p-0">
+                          <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b border-border/50">
+                            <div className={`p-1 rounded-md ${ctxMeta.color.split(" ").slice(1, 3).join(" ")}`}>
+                              <CtxIcon className={`size-3.5 ${ctxMeta.color.split(" ")[0]}`} />
+                            </div>
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${ctxMeta.color}`}>
+                              {ctxMeta.label}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground ml-auto">
+                              上下文 #{index + 1}
+                            </span>
+                          </div>
+                          <div className="px-4 py-3">
+                            <ExpandableMarkdown content={formatFact(ctx)} />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
