@@ -116,20 +116,22 @@ function TimelineItem({
   isLast,
   defaultExpanded,
   onDelete,
-  vaultUnlocked,
+  memoryUnlocked,
+  onToggleLock,
 }: {
   recall: SessionRecall
   memory: MemoryDetail | null
   isLast: boolean
   defaultExpanded?: boolean
   onDelete?: (id: string) => void
-  vaultUnlocked?: boolean
+  memoryUnlocked?: boolean
+  onToggleLock?: (memoryId: string) => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
   const isPrivate =
     memory?.visibility === "private" ||
     (memory?.tags || []).some((t) => t === "私密" || t.toLowerCase() === "private")
-  const isLocked = isPrivate && !vaultUnlocked
+  const isLocked = isPrivate && !memoryUnlocked
 
   return (
     <div className="flex gap-4">
@@ -179,11 +181,18 @@ function TimelineItem({
                     关联记忆
                   </h4>
                   <div className="flex items-center gap-2">
-                    {isPrivate && isLocked && (
-                      <span className="text-xs text-amber-500 flex items-center gap-1">
-                        <Lock className="size-3" />
-                        已加密
-                      </span>
+                    {isPrivate && onToggleLock && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onToggleLock(memory!.id)
+                        }}
+                        className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1"
+                      >
+                        {isLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                        {isLocked ? "解锁" : "锁定"}
+                      </button>
                     )}
                     {onDelete && (
                       <button
@@ -266,6 +275,8 @@ export function SessionDetailPage() {
   const vaultUnlock = useVaultStore((s) => s.unlock)
   const vaultLock = useVaultStore((s) => s.lock)
   const [sessionVaultUnlocked, setSessionVaultUnlocked] = useState(false)
+  const [unlockedMemories, setUnlockedMemories] = useState<Set<string>>(new Set())
+  const [pendingUnlockMemoryId, setPendingUnlockMemoryId] = useState<string | null>(null)
 
   const PAGE_SIZE = 10
   const totalPages = Math.ceil(recalls.length / PAGE_SIZE)
@@ -340,6 +351,10 @@ export function SessionDetailPage() {
       return
     }
     setSessionVaultUnlocked(true)
+    if (pendingUnlockMemoryId) {
+      setUnlockedMemories((prev) => new Set(prev).add(pendingUnlockMemoryId))
+      setPendingUnlockMemoryId(null)
+    }
     setVaultError(null)
     setShowVaultInput(false)
     setVaultPassword("")
@@ -347,7 +362,25 @@ export function SessionDetailPage() {
 
   const handleVaultLock = () => {
     setSessionVaultUnlocked(false)
+    setUnlockedMemories(new Set())
     vaultLock()
+  }
+
+  const handleToggleMemoryLock = (memoryId: string) => {
+    setUnlockedMemories((prev) => {
+      const next = new Set(prev)
+      if (next.has(memoryId)) {
+        next.delete(memoryId)
+        return next
+      }
+      if (sessionVaultUnlocked) {
+        next.add(memoryId)
+        return next
+      }
+      setPendingUnlockMemoryId(memoryId)
+      setShowVaultInput(true)
+      return prev
+    })
   }
 
   const stats = {
@@ -498,7 +531,8 @@ export function SessionDetailPage() {
                 isLast={index === paginatedRecalls.length - 1 && currentPage === totalPages}
                 defaultExpanded={index === 0 && currentPage === 1}
                 onDelete={handleDeleteRecall}
-                vaultUnlocked={sessionVaultUnlocked}
+                memoryUnlocked={unlockedMemories.has(recall.memory_id) || sessionVaultUnlocked}
+                onToggleLock={handleToggleMemoryLock}
               />
             ))}
             {totalPages > 1 && (
