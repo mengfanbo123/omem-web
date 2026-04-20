@@ -53,6 +53,7 @@ interface MemoryDetail {
   category: string
   memory_type: string
   visibility?: string
+  tags?: string[]
 }
 
 function formatDate(dateString: string) {
@@ -125,7 +126,9 @@ function TimelineItem({
   vaultUnlocked?: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
-  const isPrivate = memory?.visibility === "private"
+  const isPrivate =
+    memory?.visibility === "private" ||
+    (memory?.tags || []).some((t) => t === "私密" || t.toLowerCase() === "private")
   const isLocked = isPrivate && !vaultUnlocked
 
   return (
@@ -285,7 +288,7 @@ export function SessionDetailPage() {
           params: { session_id: sessionId, expand: "memories", limit: 10000 },
         })
         const list = (data?.recalls || []).sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
         setRecalls(list)
 

@@ -32,6 +32,7 @@ interface SessionRecall {
 interface MemoryDetail {
   id: string
   visibility?: string
+  tags?: string[]
 }
 
 interface SessionGroup {
@@ -110,7 +111,9 @@ export function SessionListPage() {
     for (const recall of recalls) {
       const existing = groups.get(recall.session_id)
       const memory = memories.get(recall.memory_id)
-      const isPrivate = memory?.visibility === "private"
+        const isPrivate =
+          memory?.visibility === "private" ||
+          (memory?.tags || []).some((t) => t === "私密" || t.toLowerCase() === "private")
       if (existing) {
         existing.count += 1
         if (new Date(recall.created_at) > new Date(existing.last_injected_at)) {
