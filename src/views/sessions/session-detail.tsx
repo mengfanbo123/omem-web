@@ -77,16 +77,34 @@ function shortSessionId(sessionId: string) {
 function RecallTypeBadge({ type }: { type: "auto" | "manual" }) {
   if (type === "auto") {
     return (
-      <Badge variant="secondary" className="text-xs">
+      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200">
         <Zap className="size-3 mr-1" />
         自动注入
       </Badge>
     )
   }
   return (
-    <Badge variant="outline" className="text-xs">
+    <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200">
       <MousePointerClick className="size-3 mr-1" />
       手动注入
+    </Badge>
+  )
+}
+
+function CategoryBadge({ category }: { category?: string }) {
+  const cat = (category || "未分类").toLowerCase()
+  const styles: Record<string, string> = {
+    preference: "bg-blue-100 text-blue-700 border-blue-200",
+    fact: "bg-green-100 text-green-700 border-green-200",
+    event: "bg-green-100 text-green-700 border-green-200",
+    knowledge: "bg-purple-100 text-purple-700 border-purple-200",
+    pinned: "bg-orange-100 text-orange-700 border-orange-200",
+    profile: "bg-pink-100 text-pink-700 border-pink-200",
+  }
+  const style = styles[cat] || "bg-gray-100 text-gray-700 border-gray-200"
+  return (
+    <Badge variant="outline" className={`text-xs font-normal ${style}`}>
+      {category || "未分类"}
     </Badge>
   )
 }
@@ -116,22 +134,61 @@ function TimelineItem({
   isLast,
   defaultExpanded,
   onDelete,
+  vaultUnlocked,
   memoryUnlocked,
-  onToggleLock,
+  onUnlock,
+  onLock,
 }: {
   recall: SessionRecall
   memory: MemoryDetail | null
   isLast: boolean
   defaultExpanded?: boolean
   onDelete?: (id: string) => void
+  vaultUnlocked?: boolean
   memoryUnlocked?: boolean
-  onToggleLock?: (memoryId: string) => void
+  onUnlock?: (memoryId: string) => void
+  onLock?: (memoryId: string) => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
+  const [showPwInput, setShowPwInput] = useState(false)
+  const [pw, setPw] = useState("")
+  const [pwErr, setPwErr] = useState<string | null>(null)
+  const vaultUnlock = useVaultStore((s) => s.unlock)
+
   const isPrivate =
     memory?.visibility === "private" ||
     (memory?.tags || []).some((t) => t === "私密" || t.toLowerCase() === "private")
   const isLocked = isPrivate && !memoryUnlocked
+
+  const handleToggle = async () => {
+    if (!memory) return
+    if (isLocked) {
+      if (vaultUnlocked) {
+        onUnlock?.(memory.id)
+      } else {
+        setShowPwInput(true)
+      }
+    } else {
+      onLock?.(memory.id)
+      setShowPwInput(false)
+    }
+  }
+
+  const handlePwSubmit = async () => {
+    if (!pw.trim()) {
+      setPwErr("请输入密码")
+      return
+    }
+    const valid = await vaultUnlock(pw)
+    if (valid) {
+      setShowPwInput(false)
+      setPw("")
+      setPwErr(null)
+      if (memory) onUnlock?.(memory.id)
+    } else {
+      setPwErr("密码错误")
+    }
+  }
 
   return (
     <div className="flex gap-4">
@@ -150,7 +207,7 @@ function TimelineItem({
             <div className="flex items-center gap-2 flex-wrap">
               <RecallTypeBadge type={recall.recall_type} />
               {isPrivate && (
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
                   <Lock className="size-3 mr-1" />
                   私密
                 </Badge>
@@ -181,12 +238,12 @@ function TimelineItem({
                     关联记忆
                   </h4>
                   <div className="flex items-center gap-2">
-                    {isPrivate && onToggleLock && (
+                    {isPrivate && (
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation()
-                          onToggleLock(memory!.id)
+                          handleToggle()
                         }}
                         className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1"
                       >
@@ -212,9 +269,34 @@ function TimelineItem({
                 {memory ? (
                   <div className="rounded-md bg-muted p-3 space-y-2">
                     {isLocked ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Lock className="size-4" />
-                        <span>私密记忆内容已隐藏，点击上方解锁按钮查看</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Lock className="size-4" />
+                          <span>私密记忆内容已隐藏</span>
+                        </div>
+                        {showPwInput && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="password"
+                                placeholder="输入 Vault 密码..."
+                                value={pw}
+                                onChange={(e) => {
+                                  setPw(e.target.value)
+                                  setPwErr(null)
+                                }}
+                                onKeyDown={(e) => e.key === "Enter" && handlePwSubmit()}
+                                className={pwErr ? "border-destructive flex-1" : "flex-1"}
+                              />
+                              <Button size="sm" onClick={handlePwSubmit}>
+                                解锁
+                              </Button>
+                            </div>
+                            {pwErr && (
+                              <p className="text-xs text-destructive">{pwErr}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-foreground line-clamp-4">
@@ -222,9 +304,7 @@ function TimelineItem({
                       </p>
                     )}
                     <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {memory.category || "未分类"}
-                      </Badge>
+                      <CategoryBadge category={memory.category} />
                       <span className="text-xs text-muted-foreground font-mono">
                         {memory.id?.slice(0, 8)}...
                       </span>
@@ -532,7 +612,8 @@ export function SessionDetailPage() {
                 defaultExpanded={index === 0 && currentPage === 1}
                 onDelete={handleDeleteRecall}
                 memoryUnlocked={unlockedMemories.has(recall.memory_id) || sessionVaultUnlocked}
-                onToggleLock={handleToggleMemoryLock}
+                onUnlock={handleToggleMemoryLock}
+                onLock={handleToggleMemoryLock}
               />
             ))}
             {totalPages > 1 && (
