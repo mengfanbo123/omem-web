@@ -16,6 +16,7 @@ import {
   Search,
   BrainCircuit,
   BarChart3,
+  Trash2,
 } from "lucide-react"
 
 interface SessionRecall {
@@ -73,12 +74,13 @@ function RecallTypeBadge({ type }: { type: "auto" | "manual" }) {
 }
 
 function ScoreBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
-  const percentage = Math.min(Math.max((value / max) * 100, 0), 100)
+  const safeValue = Math.max(0, Math.min(value, max))
+  const percentage = (safeValue / max) * 100
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{(value * 100).toFixed(1)}%</span>
+        <span className="font-medium">{percentage.toFixed(1)}%</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
         <div
@@ -94,12 +96,16 @@ function TimelineItem({
   recall,
   memory,
   isLast,
+  defaultExpanded,
+  onDelete,
 }: {
   recall: SessionRecall
   memory: MemoryDetail | null
   isLast: boolean
+  defaultExpanded?: boolean
+  onDelete?: (id: string) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded || false)
 
   return (
     <div className="flex gap-4">
@@ -136,11 +142,25 @@ function TimelineItem({
 
           {expanded && (
             <div className="mt-4 space-y-4 border-t border-border pt-4">
-              <div className="space-y-2">
+              <div className="flex items-center justify-between">
                 <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                   <BrainCircuit className="size-3" />
                   关联记忆
                 </h4>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDelete(recall.id)
+                    }}
+                    className="text-xs text-destructive hover:underline flex items-center gap-1"
+                  >
+                    <Trash2 className="size-3" />
+                    删除
+                  </button>
+                )}
+              </div>
                 {memory ? (
                   <div className="rounded-md bg-muted p-3 space-y-2">
                     <p className="text-sm text-foreground line-clamp-4">
@@ -200,34 +220,26 @@ export function SessionDetailPage() {
         setLoading(true)
         setError(null)
 
-        const data = await apiClient.get<{recalls: SessionRecall[]; limit: number; offset: number}>("/v1/session-recalls", {
-          params: { session_id: sessionId },
+        const data = await apiClient.get<{
+          recalls: SessionRecall[]
+          limit: number
+          offset: number
+          memories?: MemoryDetail[]
+        }>("/v1/session-recalls", {
+          params: { session_id: sessionId, expand: "memories" },
         })
         const list = (data?.recalls || []).sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
         )
         setRecalls(list)
 
-        const uniqueMemoryIds = Array.from(new Set(list.map((r) => r.memory_id)))
-        if (uniqueMemoryIds.length > 0) {
-          const memoryResults = await Promise.allSettled(
-            uniqueMemoryIds.map(async (mid) => {
-              try {
-                const mem = await apiClient.get<MemoryDetail>(`/v1/memories/${mid}`)
-                return { id: mid, mem }
-              } catch {
-                return null
-              }
-            })
-          )
-          const map = new Map<string, MemoryDetail>()
-          for (const result of memoryResults) {
-            if (result.status === "fulfilled" && result.value) {
-              map.set(result.value.id, result.value.mem)
-            }
+        const map = new Map<string, MemoryDetail>()
+        if (data?.memories) {
+          for (const mem of data.memories) {
+            map.set(mem.id, mem)
           }
-          setMemories(map)
         }
+        setMemories(map)
       } catch (err) {
         console.error("Failed to fetch session detail:", err)
         setError("加载 Session 详情失败")
@@ -239,6 +251,18 @@ export function SessionDetailPage() {
 
     fetchData()
   }, [sessionId])
+
+  const handleDeleteRecall = async (recallId: string) => {
+    if (!confirm("确定要删除这条注入记录吗？")) return
+    try {
+      await apiClient.delete(`/v1/session-recalls/${recallId}`)
+      setRecalls((prev) => prev.filter((r) => r.id !== recallId))
+      toast.success("删除成功")
+    } catch (err) {
+      console.error("Failed to delete recall:", err)
+      toast.error("删除失败")
+    }
+  }
 
   const stats = {
     total: recalls.length,
@@ -338,6 +362,8 @@ export function SessionDetailPage() {
               recall={recall}
               memory={memories.get(recall.memory_id) || null}
               isLast={index === recalls.length - 1}
+              defaultExpanded={index === 0}
+              onDelete={handleDeleteRecall}
             />
           ))
         )}
