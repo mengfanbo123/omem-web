@@ -6,7 +6,17 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import apiClient from "@/api/client"
-import { Search, Clock, Inbox, ChevronRight, Zap, MousePointerClick, Trash2, ChevronLeft } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Search, Clock, Inbox, ChevronRight, Zap, MousePointerClick, Trash2, ChevronLeft, Lock } from "lucide-react"
 
 interface SessionRecall {
   id: string
@@ -19,6 +29,11 @@ interface SessionRecall {
   created_at: string
 }
 
+interface MemoryDetail {
+  id: string
+  visibility?: string
+}
+
 interface SessionGroup {
   session_id: string
   count: number
@@ -26,6 +41,7 @@ interface SessionGroup {
   auto_count: number
   manual_count: number
   latest_query: string
+  has_private: boolean
 }
 
 const PAGE_SIZE = 20
@@ -50,18 +66,33 @@ function shortSessionId(sessionId: string) {
 export function SessionListPage() {
   const navigate = useNavigate()
   const [recalls, setRecalls] = useState<SessionRecall[]>([])
+  const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadRecalls() {
       try {
         setLoading(true)
         setError(null)
-        const data = await apiClient.get<{recalls: SessionRecall[]; limit: number; offset: number}>("/v1/session-recalls?limit=10000")
+        const data = await apiClient.get<{
+          recalls: SessionRecall[]
+          limit: number
+          offset: number
+          memories?: MemoryDetail[]
+        }>("/v1/session-recalls?limit=10000&expand=memories")
         setRecalls(data?.recalls || [])
+
+        const map = new Map<string, MemoryDetail>()
+        if (data?.memories) {
+          for (const mem of data.memories) {
+            map.set(mem.id, mem)
+          }
+        }
+        setMemories(map)
       } catch (err) {
         console.error("Failed to fetch session recalls:", err)
         setError("加载 Session 记忆注入记录失败")
@@ -78,6 +109,8 @@ export function SessionListPage() {
     const groups = new Map<string, SessionGroup>()
     for (const recall of recalls) {
       const existing = groups.get(recall.session_id)
+      const memory = memories.get(recall.memory_id)
+      const isPrivate = memory?.visibility === "private"
       if (existing) {
         existing.count += 1
         if (new Date(recall.created_at) > new Date(existing.last_injected_at)) {
@@ -89,6 +122,9 @@ export function SessionListPage() {
         } else {
           existing.manual_count += 1
         }
+        if (isPrivate) {
+          existing.has_private = true
+        }
       } else {
         groups.set(recall.session_id, {
           session_id: recall.session_id,
@@ -97,13 +133,14 @@ export function SessionListPage() {
           auto_count: recall.recall_type === "auto" ? 1 : 0,
           manual_count: recall.recall_type === "manual" ? 1 : 0,
           latest_query: recall.query_text,
+          has_private: isPrivate,
         })
       }
     }
     return Array.from(groups.values()).sort(
       (a, b) => new Date(b.last_injected_at).getTime() - new Date(a.last_injected_at).getTime()
     )
-  }, [recalls])
+  }, [recalls, memories])
 
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return sessions
@@ -124,20 +161,25 @@ export function SessionListPage() {
     navigate(`/sessions/${encodeURIComponent(sessionId)}`)
   }
 
-  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+  const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm(`确定要删除 Session ${shortSessionId(sessionId)} 的所有注入记录吗？`)) return
-    
+    setDeleteTarget(sessionId)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      const sessionRecalls = recalls.filter(r => r.session_id === sessionId)
+      const sessionRecalls = recalls.filter(r => r.session_id === deleteTarget)
       await Promise.all(sessionRecalls.map(r => 
         apiClient.delete(`/v1/session-recalls/${r.id}`)
       ))
-      setRecalls(prev => prev.filter(r => r.session_id !== sessionId))
+      setRecalls(prev => prev.filter(r => r.session_id !== deleteTarget))
       toast.success("删除成功")
     } catch (err) {
       console.error("Failed to delete session recalls:", err)
       toast.error("删除失败")
+    } finally {
+      setDeleteTarget(null)
     }
   }
 
@@ -212,6 +254,12 @@ export function SessionListPage() {
                   <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded shrink-0">
                     {shortSessionId(session.session_id)}
                   </code>
+                  {session.has_private && (
+                    <Badge variant="secondary" className="text-xs shrink-0">
+                      <Lock className="size-3 mr-1" />
+                      私密
+                    </Badge>
+                  )}
                   {session.latest_query && (
                     <span className="text-xs text-muted-foreground truncate max-w-[300px] sm:max-w-[400px] lg:max-w-[500px]">
                       {session.latest_query}
@@ -286,6 +334,23 @@ export function SessionListPage() {
           )}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除 Session</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作不可撤销。将删除 Session {deleteTarget ? shortSessionId(deleteTarget) : ""} 的所有注入记录。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

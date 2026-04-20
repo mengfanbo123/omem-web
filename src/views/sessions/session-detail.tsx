@@ -5,7 +5,19 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import apiClient from "@/api/client"
+import { useVaultStore } from "@/stores/vault"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import {
   ArrowLeft,
   Clock,
@@ -17,6 +29,10 @@ import {
   BrainCircuit,
   BarChart3,
   Trash2,
+  Lock,
+  Unlock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 
 interface SessionRecall {
@@ -36,6 +52,7 @@ interface MemoryDetail {
   l0_abstract: string
   category: string
   memory_type: string
+  visibility?: string
 }
 
 function formatDate(dateString: string) {
@@ -98,14 +115,18 @@ function TimelineItem({
   isLast,
   defaultExpanded,
   onDelete,
+  vaultUnlocked,
 }: {
   recall: SessionRecall
   memory: MemoryDetail | null
   isLast: boolean
   defaultExpanded?: boolean
   onDelete?: (id: string) => void
+  vaultUnlocked?: boolean
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
+  const isPrivate = memory?.visibility === "private"
+  const isLocked = isPrivate && !vaultUnlocked
 
   return (
     <div className="flex gap-4">
@@ -123,6 +144,12 @@ function TimelineItem({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               <RecallTypeBadge type={recall.recall_type} />
+              {isPrivate && (
+                <Badge variant="secondary" className="text-xs">
+                  <Lock className="size-3 mr-1" />
+                  私密
+                </Badge>
+              )}
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="size-3" />
                 {formatDate(recall.created_at)}
@@ -142,30 +169,46 @@ function TimelineItem({
 
           {expanded && (
             <div className="mt-4 space-y-4 border-t border-border pt-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <BrainCircuit className="size-3" />
-                  关联记忆
-                </h4>
-                {onDelete && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onDelete(recall.id)
-                    }}
-                    className="text-xs text-destructive hover:underline flex items-center gap-1"
-                  >
-                    <Trash2 className="size-3" />
-                    删除
-                  </button>
-                )}
-              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <BrainCircuit className="size-3" />
+                    关联记忆
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {isPrivate && isLocked && (
+                      <span className="text-xs text-amber-500 flex items-center gap-1">
+                        <Lock className="size-3" />
+                        已加密
+                      </span>
+                    )}
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDelete(recall.id)
+                        }}
+                        className="text-xs text-destructive hover:underline flex items-center gap-1"
+                      >
+                        <Trash2 className="size-3" />
+                        删除
+                      </button>
+                    )}
+                  </div>
+                </div>
                 {memory ? (
                   <div className="rounded-md bg-muted p-3 space-y-2">
-                    <p className="text-sm text-foreground line-clamp-4">
-                      {memory.content || memory.l0_abstract || "—"}
-                    </p>
+                    {isLocked ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Lock className="size-4" />
+                        <span>私密记忆内容已隐藏，点击上方解锁按钮查看</span>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-foreground line-clamp-4">
+                        {memory.content || memory.l0_abstract || "—"}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-xs font-normal">
                         {memory.category || "未分类"}
@@ -186,8 +229,8 @@ function TimelineItem({
                   匹配指标
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <ScoreBar label="相似度" value={recall.similarity_score} />
-                  <ScoreBar label="LLM 置信度" value={recall.llm_confidence} />
+                  <ScoreBar label="Query 关联度" value={recall.similarity_score} />
+                  <ScoreBar label="记忆匹配度" value={recall.llm_confidence} />
                 </div>
               </div>
 
@@ -211,6 +254,19 @@ export function SessionDetailPage() {
   const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [showVaultInput, setShowVaultInput] = useState(false)
+  const [vaultPassword, setVaultPassword] = useState("")
+  const [vaultError, setVaultError] = useState<string | null>(null)
+
+  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
+  const vaultUnlock = useVaultStore((s) => s.unlock)
+  const vaultLock = useVaultStore((s) => s.lock)
+
+  const PAGE_SIZE = 10
+  const totalPages = Math.ceil(recalls.length / PAGE_SIZE)
+  const paginatedRecalls = recalls.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (!sessionId) return
@@ -226,7 +282,7 @@ export function SessionDetailPage() {
           offset: number
           memories?: MemoryDetail[]
         }>("/v1/session-recalls", {
-          params: { session_id: sessionId, expand: "memories" },
+          params: { session_id: sessionId, expand: "memories", limit: 10000 },
         })
         const list = (data?.recalls || []).sort(
           (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -252,16 +308,41 @@ export function SessionDetailPage() {
     fetchData()
   }, [sessionId])
 
-  const handleDeleteRecall = async (recallId: string) => {
-    if (!confirm("确定要删除这条注入记录吗？")) return
+  const handleDeleteRecall = (recallId: string) => {
+    setDeleteTarget(recallId)
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
     try {
-      await apiClient.delete(`/v1/session-recalls/${recallId}`)
-      setRecalls((prev) => prev.filter((r) => r.id !== recallId))
+      await apiClient.delete(`/v1/session-recalls/${deleteTarget}`)
+      setRecalls((prev) => prev.filter((r) => r.id !== deleteTarget))
       toast.success("删除成功")
     } catch (err) {
       console.error("Failed to delete recall:", err)
       toast.error("删除失败")
+    } finally {
+      setDeleteTarget(null)
     }
+  }
+
+  const handleVaultUnlock = async () => {
+    if (!vaultPassword.trim()) {
+      setVaultError("请输入密码")
+      return
+    }
+    const isValid = await vaultUnlock(vaultPassword)
+    if (!isValid) {
+      setVaultError("密码错误")
+      return
+    }
+    setVaultError(null)
+    setShowVaultInput(false)
+    setVaultPassword("")
+  }
+
+  const handleVaultLock = () => {
+    vaultLock()
   }
 
   const stats = {
@@ -350,24 +431,114 @@ export function SessionDetailPage() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-sm font-medium text-muted-foreground">注入时间线</h2>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">注入时间线</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              共 {recalls.length} 条记录
+            </span>
+            {vaultUnlocked ? (
+              <Button variant="outline" size="sm" onClick={handleVaultLock}>
+                <Lock className="size-3.5 mr-1" />
+                锁定 Vault
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVaultInput(!showVaultInput)}
+              >
+                <Unlock className="size-3.5 mr-1" />
+                解锁 Vault
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {showVaultInput && (
+          <div className="space-y-2 max-w-md">
+            <div className="flex items-center gap-2">
+              <Input
+                type="password"
+                placeholder="输入 Vault 密码..."
+                value={vaultPassword}
+                onChange={(e) => {
+                  setVaultPassword(e.target.value)
+                  setVaultError(null)
+                }}
+                onKeyDown={(e) => e.key === "Enter" && handleVaultUnlock()}
+                className={vaultError ? "border-destructive flex-1" : "flex-1"}
+              />
+              <Button size="sm" onClick={handleVaultUnlock}>
+                解锁
+              </Button>
+            </div>
+            {vaultError && (
+              <p className="text-xs text-destructive">{vaultError}</p>
+            )}
+          </div>
+        )}
+
         {recalls.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             暂无注入记录
           </div>
         ) : (
-          recalls.map((recall, index) => (
-            <TimelineItem
-              key={recall.id}
-              recall={recall}
-              memory={memories.get(recall.memory_id) || null}
-              isLast={index === recalls.length - 1}
-              defaultExpanded={index === 0}
-              onDelete={handleDeleteRecall}
-            />
-          ))
+          <>
+            {paginatedRecalls.map((recall, index) => (
+              <TimelineItem
+                key={recall.id}
+                recall={recall}
+                memory={memories.get(recall.memory_id) || null}
+                isLast={index === paginatedRecalls.length - 1 && currentPage === totalPages}
+                defaultExpanded={index === 0 && currentPage === 1}
+                onDelete={handleDeleteRecall}
+                vaultUnlocked={vaultUnlocked}
+              />
+            ))}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="size-4" />
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除注入记录</AlertDialogTitle>
+            <AlertDialogDescription>
+              此操作不可撤销。确定要删除这条注入记录吗？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
