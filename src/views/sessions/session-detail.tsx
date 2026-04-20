@@ -260,9 +260,9 @@ export function SessionDetailPage() {
   const [vaultPassword, setVaultPassword] = useState("")
   const [vaultError, setVaultError] = useState<string | null>(null)
 
-  const vaultUnlocked = useVaultStore((s) => s.isUnlocked)
   const vaultUnlock = useVaultStore((s) => s.unlock)
   const vaultLock = useVaultStore((s) => s.lock)
+  const [sessionVaultUnlocked, setSessionVaultUnlocked] = useState(false)
 
   const PAGE_SIZE = 10
   const totalPages = Math.ceil(recalls.length / PAGE_SIZE)
@@ -336,12 +336,14 @@ export function SessionDetailPage() {
       setVaultError("密码错误")
       return
     }
+    setSessionVaultUnlocked(true)
     setVaultError(null)
     setShowVaultInput(false)
     setVaultPassword("")
   }
 
   const handleVaultLock = () => {
+    setSessionVaultUnlocked(false)
     vaultLock()
   }
 
@@ -437,7 +439,7 @@ export function SessionDetailPage() {
             <span className="text-xs text-muted-foreground">
               共 {recalls.length} 条记录
             </span>
-            {vaultUnlocked ? (
+            {sessionVaultUnlocked ? (
               <Button variant="outline" size="sm" onClick={handleVaultLock}>
                 <Lock className="size-3.5 mr-1" />
                 锁定 Vault
@@ -493,7 +495,7 @@ export function SessionDetailPage() {
                 isLast={index === paginatedRecalls.length - 1 && currentPage === totalPages}
                 defaultExpanded={index === 0 && currentPage === 1}
                 onDelete={handleDeleteRecall}
-                vaultUnlocked={vaultUnlocked}
+                vaultUnlocked={sessionVaultUnlocked}
               />
             ))}
             {totalPages > 1 && (
