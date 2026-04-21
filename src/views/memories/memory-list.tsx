@@ -304,6 +304,7 @@ export function MemoryListPage() {
 
   const hasNext = page * pageSize < totalCount
   const hasPrev = page > 1
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   return (
     <div className="space-y-6">
@@ -446,6 +447,37 @@ export function MemoryListPage() {
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {!loading && memories.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            共 {totalCount} 条记忆
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={handlePreviousPage}
+              disabled={!hasPrev || loading}
+            >
+              <ChevronLeft className="size-3" />
+            </Button>
+            <span className="text-xs text-muted-foreground min-w-[3ch] text-center">
+              {page}/{totalPages}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={handleNextPage}
+              disabled={!hasNext || loading}
+            >
+              <ChevronRight className="size-3" />
+            </Button>
+          </div>
         </div>
       )}
 

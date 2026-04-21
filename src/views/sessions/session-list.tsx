@@ -217,6 +217,32 @@ export function SessionListPage() {
         </div>
       )}
 
+      {!loading && filteredSessions.length > 0 && totalPages > 1 && (
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+          >
+            <ChevronLeft className="size-3" />
+          </Button>
+          <span className="text-xs text-muted-foreground min-w-[3ch] text-center">
+            {currentPage}/{totalPages}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+          >
+            <ChevronRight className="size-3" />
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-3">
         {loading ? (
           [1, 2, 3, 4, 5].map((n) => (

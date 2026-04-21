@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { useParams, useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -126,6 +128,7 @@ function TimelineItem({
   memoryUnlocked,
   onUnlock,
   onLock,
+  onVaultUnlock,
 }: {
   recall: SessionRecall
   memory: MemoryDetail | null
@@ -136,12 +139,14 @@ function TimelineItem({
   memoryUnlocked?: boolean
   onUnlock?: (memoryId: string) => void
   onLock?: (memoryId: string) => void
+  onVaultUnlock?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
   const [showPwInput, setShowPwInput] = useState(false)
   const [pw, setPw] = useState("")
   const [pwErr, setPwErr] = useState<string | null>(null)
   const vaultUnlock = useVaultStore((s) => s.unlock)
+  const vaultIsUnlocked = useVaultStore((s) => s.isUnlocked)
 
   const isPrivate =
     memory?.visibility === "private" ||
@@ -151,7 +156,7 @@ function TimelineItem({
   const handleToggle = async () => {
     if (!memory) return
     if (isLocked) {
-      if (vaultUnlocked) {
+      if (vaultUnlocked || vaultIsUnlocked) {
         onUnlock?.(memory.id)
       } else {
         setShowPwInput(true)
@@ -172,6 +177,7 @@ function TimelineItem({
       setShowPwInput(false)
       setPw("")
       setPwErr(null)
+      onVaultUnlock?.()
       if (memory) onUnlock?.(memory.id)
     } else {
       setPwErr("密码错误")
@@ -186,39 +192,41 @@ function TimelineItem({
       </div>
 
       <div className="flex-1 pb-6">
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="w-full text-left rounded-lg border border-border bg-card p-4 cursor-pointer transition-colors hover:bg-muted/50"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 flex-wrap">
-              <RecallTypeBadge type={recall.recall_type} />
-              {isPrivate && (
-                <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
-                  <Lock className="size-3 mr-1" />
-                  私密
-                </Badge>
+        <div className="rounded-lg border border-border bg-card transition-colors hover:bg-muted/50">
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="w-full text-left p-4 cursor-pointer"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 flex-wrap">
+                <RecallTypeBadge type={recall.recall_type} />
+                {isPrivate && (
+                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
+                    <Lock className="size-3 mr-1" />
+                    私密
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="size-3" />
+                  {formatDate(recall.created_at)}
+                </span>
+              </div>
+              {expanded ? (
+                <ChevronUp className="size-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-4 text-muted-foreground" />
               )}
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Clock className="size-3" />
-                {formatDate(recall.created_at)}
-              </span>
             </div>
-            {expanded ? (
-              <ChevronUp className="size-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="size-4 text-muted-foreground" />
-            )}
-          </div>
 
-          <div className="mt-2 text-sm text-muted-foreground flex items-center gap-1.5">
-            <Search className="size-3.5" />
-            <span className="line-clamp-1">{recall.query_text || "—"}</span>
-          </div>
+            <div className="mt-2 text-sm text-muted-foreground flex items-center gap-1.5">
+              <Search className="size-3.5" />
+              <span className="line-clamp-1">{recall.query_text || "—"}</span>
+            </div>
+          </button>
 
           {expanded && (
-            <div className="mt-4 space-y-4 border-t border-border pt-4">
+            <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
               <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -273,9 +281,11 @@ function TimelineItem({
                           )}
                         </div>
                       ) : (
-                        <p className="text-sm text-foreground line-clamp-4 flex-1">
-                          {memory.content || memory.l0_abstract || "—"}
-                        </p>
+                        <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {memory.content || memory.l0_abstract || "—"}
+                          </ReactMarkdown>
+                        </div>
                       )}
                       {isPrivate && (
                         <button
@@ -319,7 +329,7 @@ function TimelineItem({
               </div>
             </div>
           )}
-        </button>
+        </div>
       </div>
     </div>
   )
@@ -635,9 +645,38 @@ export function SessionDetailPage() {
                 memoryUnlocked={(sessionVaultUnlocked && !manuallyLocked.has(recall.memory_id)) || unlockedMemories.has(recall.memory_id)}
                 onUnlock={handleToggleMemoryLock}
                 onLock={handleToggleMemoryLock}
+                onVaultUnlock={() => setSessionVaultUnlocked(true)}
               />
             ))}
 
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 pt-4">
+                <span className="text-xs text-muted-foreground">
+                  共 {recalls.length} 条记录
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
