@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import apiClient from "@/api/client"
 import { useVaultStore } from "@/stores/vault"
+import { getTagClassName } from "@/lib/tag-utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -92,21 +93,8 @@ function RecallTypeBadge({ type }: { type: "auto" | "manual" }) {
 }
 
 function CategoryBadge({ category }: { category?: string }) {
-  const cat = (category || "未分类").toLowerCase()
-  const styles: Record<string, string> = {
-    preference: "bg-blue-100 text-blue-700 border-blue-200",
-    fact: "bg-green-100 text-green-700 border-green-200",
-    event: "bg-green-100 text-green-700 border-green-200",
-    knowledge: "bg-purple-100 text-purple-700 border-purple-200",
-    pinned: "bg-orange-100 text-orange-700 border-orange-200",
-    profile: "bg-pink-100 text-pink-700 border-pink-200",
-  }
-  const style = styles[cat] || "bg-gray-100 text-gray-700 border-gray-200"
-  return (
-    <Badge variant="outline" className={`text-xs font-normal ${style}`}>
-      {category || "未分类"}
-    </Badge>
-  )
+  const tagClass = getTagClassName(category || "未分类", "text-xs font-normal")
+  return <Badge variant="outline" className={tagClass}>{category || "未分类"}</Badge>
 }
 
 function ScoreBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
@@ -232,25 +220,11 @@ function TimelineItem({
           {expanded && (
             <div className="mt-4 space-y-4 border-t border-border pt-4">
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <BrainCircuit className="size-3" />
-                    关联记忆
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    {isPrivate && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleToggle()
-                        }}
-                        className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1"
-                      >
-                        {isLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-                        {isLocked ? "解锁" : "锁定"}
-                      </button>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <BrainCircuit className="size-3" />
+                      关联记忆
+                    </h4>
                     {onDelete && (
                       <button
                         type="button"
@@ -265,44 +239,58 @@ function TimelineItem({
                       </button>
                     )}
                   </div>
-                </div>
                 {memory ? (
                   <div className="rounded-md bg-muted p-3 space-y-2">
-                    {isLocked ? (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Lock className="size-4" />
-                          <span>私密记忆内容已隐藏</span>
-                        </div>
-                        {showPwInput && (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <Input
-                                type="password"
-                                placeholder="输入 Vault 密码..."
-                                value={pw}
-                                onChange={(e) => {
-                                  setPw(e.target.value)
-                                  setPwErr(null)
-                                }}
-                                onKeyDown={(e) => e.key === "Enter" && handlePwSubmit()}
-                                className={pwErr ? "border-destructive flex-1" : "flex-1"}
-                              />
-                              <Button size="sm" onClick={handlePwSubmit}>
-                                解锁
-                              </Button>
-                            </div>
-                            {pwErr && (
-                              <p className="text-xs text-destructive">{pwErr}</p>
-                            )}
+                    <div className="flex items-start justify-between gap-2">
+                      {isLocked ? (
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Lock className="size-4" />
+                            <span>私密记忆内容已隐藏</span>
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-foreground line-clamp-4">
-                        {memory.content || memory.l0_abstract || "—"}
-                      </p>
-                    )}
+                          {showPwInput && (
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="password"
+                                  placeholder="输入 Vault 密码..."
+                                  value={pw}
+                                  onChange={(e) => {
+                                    setPw(e.target.value)
+                                    setPwErr(null)
+                                  }}
+                                  onKeyDown={(e) => e.key === "Enter" && handlePwSubmit()}
+                                  className={pwErr ? "border-destructive flex-1" : "flex-1"}
+                                />
+                                <Button size="sm" onClick={handlePwSubmit}>
+                                  解锁
+                                </Button>
+                              </div>
+                              {pwErr && (
+                                <p className="text-xs text-destructive">{pwErr}</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-foreground line-clamp-4 flex-1">
+                          {memory.content || memory.l0_abstract || "—"}
+                        </p>
+                      )}
+                      {isPrivate && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggle()
+                          }}
+                          className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1 shrink-0"
+                        >
+                          {isLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+                          {isLocked ? "解锁" : "锁定"}
+                        </button>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2">
                       <CategoryBadge category={memory.category} />
                       <span className="text-xs text-muted-foreground font-mono">
@@ -356,6 +344,7 @@ export function SessionDetailPage() {
   const vaultLock = useVaultStore((s) => s.lock)
   const [sessionVaultUnlocked, setSessionVaultUnlocked] = useState(false)
   const [unlockedMemories, setUnlockedMemories] = useState<Set<string>>(new Set())
+  const [manuallyLocked, setManuallyLocked] = useState<Set<string>>(new Set())
   const [pendingUnlockMemoryId, setPendingUnlockMemoryId] = useState<string | null>(null)
 
   const PAGE_SIZE = 10
@@ -443,24 +432,30 @@ export function SessionDetailPage() {
   const handleVaultLock = () => {
     setSessionVaultUnlocked(false)
     setUnlockedMemories(new Set())
+    setManuallyLocked(new Set())
     vaultLock()
   }
 
   const handleToggleMemoryLock = (memoryId: string) => {
-    setUnlockedMemories((prev) => {
-      const next = new Set(prev)
-      if (next.has(memoryId)) {
+    const isCurrentlyUnlocked = unlockedMemories.has(memoryId) || (sessionVaultUnlocked && !manuallyLocked.has(memoryId))
+
+    if (isCurrentlyUnlocked) {
+      setManuallyLocked((prev) => new Set(prev).add(memoryId))
+      setUnlockedMemories((prev) => {
+        const next = new Set(prev)
         next.delete(memoryId)
         return next
-      }
-      if (sessionVaultUnlocked) {
-        next.add(memoryId)
+      })
+    } else if (sessionVaultUnlocked) {
+      setManuallyLocked((prev) => {
+        const next = new Set(prev)
+        next.delete(memoryId)
         return next
-      }
+      })
+    } else {
       setPendingUnlockMemoryId(memoryId)
       setShowVaultInput(true)
-      return prev
-    })
+    }
   }
 
   const stats = {
@@ -555,6 +550,31 @@ export function SessionDetailPage() {
             <span className="text-xs text-muted-foreground">
               共 {recalls.length} 条记录
             </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="size-3" />
+                </Button>
+                <span className="text-xs text-muted-foreground min-w-[3ch] text-center">
+                  {currentPage}/{totalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="size-3" />
+                </Button>
+              </div>
+            )}
             {sessionVaultUnlocked ? (
               <Button variant="outline" size="sm" onClick={handleVaultLock}>
                 <Lock className="size-3.5 mr-1" />
@@ -611,34 +631,13 @@ export function SessionDetailPage() {
                 isLast={index === paginatedRecalls.length - 1 && currentPage === totalPages}
                 defaultExpanded={index === 0 && currentPage === 1}
                 onDelete={handleDeleteRecall}
-                memoryUnlocked={unlockedMemories.has(recall.memory_id) || sessionVaultUnlocked}
+                vaultUnlocked={sessionVaultUnlocked}
+                memoryUnlocked={(sessionVaultUnlocked && !manuallyLocked.has(recall.memory_id)) || unlockedMemories.has(recall.memory_id)}
                 onUnlock={handleToggleMemoryLock}
                 onLock={handleToggleMemoryLock}
               />
             ))}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="size-4" />
-                </Button>
-                <span className="text-sm text-muted-foreground">
-                  {currentPage} / {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="size-4" />
-                </Button>
-              </div>
-            )}
+
           </>
         )}
       </div>
