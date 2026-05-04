@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react"
 import { toast } from "sonner"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
@@ -16,24 +16,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Search, Clock, Inbox, ChevronRight, Zap, MousePointerClick, Trash2, ChevronLeft, Lock } from "lucide-react"
-
-interface SessionRecall {
-  id: string
-  session_id: string
-  memory_id: string
-  recall_type: "auto" | "manual"
-  query_text: string
-  similarity_score: number
-  llm_confidence: number
-  created_at: string
-}
-
-interface MemoryDetail {
-  id: string
-  visibility?: string
-  tags?: string[]
-}
+import { Search, Clock, Inbox, ChevronRight, Zap, MousePointerClick, Trash2, ChevronLeft, X, SlidersHorizontal } from "lucide-react"
 
 interface SessionGroup {
   session_id: string
@@ -42,7 +25,13 @@ interface SessionGroup {
   auto_count: number
   manual_count: number
   latest_query: string
-  has_private: boolean
+}
+
+interface GroupsResponse {
+  groups: SessionGroup[]
+  total_count: number
+  limit: number
+  offset: number
 }
 
 const PAGE_SIZE = 20
@@ -66,36 +55,29 @@ function shortSessionId(sessionId: string) {
 
 export function SessionListPage() {
   const navigate = useNavigate()
-  const [recalls, setRecalls] = useState<SessionRecall[]>([])
-  const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
+  const location = useLocation()
+  const [groups, setGroups] = useState<SessionGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
-    async function loadRecalls() {
+    async function loadGroups() {
       try {
         setLoading(true)
         setError(null)
-        const data = await apiClient.get<{
-          recalls: SessionRecall[]
-          limit: number
-          offset: number
-          memories?: MemoryDetail[]
-        }>("/v1/session-recalls?limit=10000&expand=memories")
-        setRecalls(data?.recalls || [])
-
-        const map = new Map<string, MemoryDetail>()
-        if (data?.memories) {
-          for (const mem of data.memories) {
-            map.set(mem.id, mem)
-          }
-        }
-        setMemories(map)
+        const data = await apiClient.get<GroupsResponse>("/v1/session-recalls/groups", {
+          params: { limit: 1000, offset: 0 },
+        })
+        setGroups(data?.groups || [])
       } catch (err) {
-        console.error("Failed to fetch session recalls:", err)
+        console.error("Failed to fetch session groups:", err)
         setError("加载 Session 记忆注入记录失败")
         toast.error("加载 Session 记忆注入记录失败")
       } finally {
@@ -103,52 +85,19 @@ export function SessionListPage() {
       }
     }
 
-    loadRecalls()
+    loadGroups()
   }, [])
 
-  const sessions = useMemo<SessionGroup[]>(() => {
-    const groups = new Map<string, SessionGroup>()
-    for (const recall of recalls) {
-      const existing = groups.get(recall.session_id)
-      const memory = memories.get(recall.memory_id)
-        const isPrivate =
-          memory?.visibility === "private" ||
-          (memory?.tags || []).some((t) => t === "私密" || t.toLowerCase() === "private")
-      if (existing) {
-        existing.count += 1
-        if (new Date(recall.created_at) > new Date(existing.last_injected_at)) {
-          existing.last_injected_at = recall.created_at
-          existing.latest_query = recall.query_text
-        }
-        if (recall.recall_type === "auto") {
-          existing.auto_count += 1
-        } else {
-          existing.manual_count += 1
-        }
-        if (isPrivate) {
-          existing.has_private = true
-        }
-      } else {
-        groups.set(recall.session_id, {
-          session_id: recall.session_id,
-          count: 1,
-          last_injected_at: recall.created_at,
-          auto_count: recall.recall_type === "auto" ? 1 : 0,
-          manual_count: recall.recall_type === "manual" ? 1 : 0,
-          latest_query: recall.query_text,
-          has_private: isPrivate,
-        })
-      }
-    }
-    return Array.from(groups.values()).sort(
+  const sessions = useMemo(() => {
+    return [...groups].sort(
       (a, b) => new Date(b.last_injected_at).getTime() - new Date(a.last_injected_at).getTime()
     )
-  }, [recalls, memories])
+  }, [groups])
 
   const filteredSessions = useMemo(() => {
     if (!searchQuery.trim()) return sessions
     const q = searchQuery.trim().toLowerCase()
-    return sessions.filter((s) => 
+    return sessions.filter((s) =>
       s.session_id.toLowerCase().includes(q) ||
       s.latest_query.toLowerCase().includes(q)
     )
@@ -161,7 +110,7 @@ export function SessionListPage() {
   }, [filteredSessions, currentPage])
 
   const handleRowClick = (sessionId: string) => {
-    navigate(`/sessions/${encodeURIComponent(sessionId)}`)
+    navigate(`/sessions/${encodeURIComponent(sessionId)}`, { state: { from: location.pathname + location.search } })
   }
 
   const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
@@ -171,18 +120,59 @@ export function SessionListPage() {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
+    setIsDeleting(true)
     try {
-      const sessionRecalls = recalls.filter(r => r.session_id === deleteTarget)
-      await Promise.all(sessionRecalls.map(r => 
-        apiClient.delete(`/v1/session-recalls/${r.id}`)
-      ))
-      setRecalls(prev => prev.filter(r => r.session_id !== deleteTarget))
+      await apiClient.delete(`/v1/session-recalls/session/${encodeURIComponent(deleteTarget)}`)
+      setGroups((prev) => prev.filter((g) => g.session_id !== deleteTarget))
       toast.success("删除成功")
     } catch (err) {
-      console.error("Failed to delete session recalls:", err)
+      console.error("Failed to delete session:", err)
       toast.error("删除失败")
     } finally {
+      setIsDeleting(false)
       setDeleteTarget(null)
+    }
+  }
+
+  const toggleSelection = (sessionId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(sessionId)) {
+        next.delete(sessionId)
+      } else {
+        next.add(sessionId)
+      }
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    setSelectedIds(new Set(paginatedSessions.map((s) => s.session_id)))
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
+  }
+
+  const confirmBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    const ids = Array.from(selectedIds)
+    setIsDeleting(true)
+    try {
+      await Promise.all(
+        ids.map((id) =>
+          apiClient.delete(`/v1/session-recalls/session/${encodeURIComponent(id)}`)
+        )
+      )
+      setGroups((prev) => prev.filter((g) => !ids.includes(g.session_id)))
+      setSelectedIds(new Set())
+      setBatchDeleteOpen(false)
+      toast.success(`已删除 ${ids.length} 个 Session`)
+    } catch (err) {
+      console.error("Failed to batch delete sessions:", err)
+      toast.error("批量删除失败")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -196,7 +186,7 @@ export function SessionListPage() {
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
             type="text"
@@ -209,37 +199,94 @@ export function SessionListPage() {
             className="pl-9"
           />
         </div>
+
+        <Button
+          variant={batchMode ? "default" : "outline"}
+          size="sm"
+          onClick={() => {
+            setBatchMode(!batchMode)
+            if (batchMode) clearSelection()
+          }}
+        >
+          {batchMode ? (
+            <>
+              <X className="size-3.5 mr-1.5" />
+              退出管理
+            </>
+          ) : (
+            <>
+              <SlidersHorizontal className="size-3.5 mr-1.5" />
+              批量管理
+            </>
+          )}
+        </Button>
+
+        {!loading && filteredSessions.length > 0 && totalPages > 1 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="size-3" />
+              </Button>
+              <span className="text-xs text-muted-foreground min-w-[3ch] text-center">
+                {currentPage}/{totalPages}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+              >
+                <ChevronRight className="size-3" />
+              </Button>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              共 {filteredSessions.length} 个
+            </span>
+          </div>
+        )}
       </div>
+
+      {batchMode && (
+        <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">
+              已选择 {selectedIds.size} 个 Session
+            </span>
+            {selectedIds.size > 0 && (
+              <>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={clearSelection}>
+                  取消选择
+                </Button>
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={selectAll}>
+                  全选本页
+                </Button>
+              </>
+            )}
+          </div>
+          {selectedIds.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="h-7"
+              onClick={() => setBatchDeleteOpen(true)}
+            >
+              <Trash2 className="size-3.5 mr-1" />
+              删除 ({selectedIds.size})
+            </Button>
+          )}
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
-        </div>
-      )}
-
-      {!loading && filteredSessions.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            <ChevronLeft className="size-3" />
-          </Button>
-          <span className="text-xs text-muted-foreground min-w-[3ch] text-center">
-            {currentPage}/{totalPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-          >
-            <ChevronRight className="size-3" />
-          </Button>
         </div>
       )}
 
@@ -271,65 +318,83 @@ export function SessionListPage() {
             </div>
           </div>
         ) : (
-          paginatedSessions.map((session) => (
-            <button
-              type="button"
-              key={session.session_id}
-              onClick={() => handleRowClick(session.session_id)}
-              className="w-full text-left rounded-lg border border-border bg-card p-4 cursor-pointer transition-colors hover:bg-muted/50 group relative"
-            >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded shrink-0">
-                    {shortSessionId(session.session_id)}
-                  </code>
-                  {session.has_private && (
-                    <Badge variant="secondary" className="text-xs shrink-0">
-                      <Lock className="size-3 mr-1" />
-                      私密
-                    </Badge>
-                  )}
-                  {session.latest_query && (
-                    <span className="text-xs text-muted-foreground truncate max-w-[300px] sm:max-w-[400px] lg:max-w-[500px]">
-                      {session.latest_query}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground shrink-0">
-                  <span className="text-xs flex items-center gap-1 whitespace-nowrap">
-                    <Clock className="size-3.5" />
-                    {formatDate(session.last_injected_at)}
-                  </span>
-                  <ChevronRight className="size-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+          paginatedSessions.map((session) => {
+            const isSelected = selectedIds.has(session.session_id)
+            return (
+              <div
+                key={session.session_id}
+                onClick={() =>
+                  batchMode ? toggleSelection(session.session_id) : handleRowClick(session.session_id)
+                }
+                className={`w-full text-left rounded-lg border border-border bg-card p-4 cursor-pointer transition-colors hover:bg-muted/50 group relative ${
+                  batchMode && isSelected ? "ring-2 ring-primary bg-primary/5" : ""
+                }`}
+              >
+                {batchMode && (
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        e.stopPropagation()
+                        toggleSelection(session.session_id)
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="size-4 cursor-pointer"
+                    />
+                  </div>
+                )}
+                <div className={batchMode ? "pl-8" : ""}>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <code className="text-sm font-mono bg-muted px-2 py-0.5 rounded shrink-0">
+                        {shortSessionId(session.session_id)}
+                      </code>
+                      {session.latest_query && (
+                        <span className="text-xs text-muted-foreground truncate max-w-[300px] sm:max-w-[400px] lg:max-w-[500px]">
+                          {session.latest_query}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+                      <span className="text-xs flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="size-3.5" />
+                        {formatDate(session.last_injected_at)}
+                      </span>
+                      <ChevronRight className="size-4 opacity-0 group-hover:opacity-50 transition-opacity" />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="secondary" className="text-xs font-normal">
+                        <Zap className="size-3 mr-1" />
+                        自动 {session.auto_count}
+                      </Badge>
+                      {session.manual_count > 0 && (
+                        <Badge variant="outline" className="text-xs font-normal">
+                          <MousePointerClick className="size-3 mr-1" />
+                          手动 {session.manual_count}
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        共 <span className="font-medium text-foreground">{session.count}</span> 条
+                      </span>
+                    </div>
+                    {!batchMode && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => handleDeleteSession(session.session_id, e)}
+                      >
+                        <Trash2 className="size-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    <Zap className="size-3 mr-1" />
-                    自动 {session.auto_count}
-                  </Badge>
-                  {session.manual_count > 0 && (
-                    <Badge variant="outline" className="text-xs font-normal">
-                      <MousePointerClick className="size-3 mr-1" />
-                      手动 {session.manual_count}
-                    </Badge>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    共 <span className="font-medium text-foreground">{session.count}</span> 条
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e) => handleDeleteSession(session.session_id, e)}
-                >
-                  <Trash2 className="size-4 text-destructive" />
-                </Button>
-              </div>
-            </button>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -343,7 +408,7 @@ export function SessionListPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
               >
                 <ChevronLeft className="size-4" />
@@ -354,7 +419,7 @@ export function SessionListPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
               >
                 <ChevronRight className="size-4" />
@@ -364,7 +429,7 @@ export function SessionListPage() {
         </div>
       )}
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open && !isDeleting) setDeleteTarget(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除 Session</AlertDialogTitle>
@@ -373,9 +438,26 @@ export function SessionListPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              删除
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)} disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={isDeleting} onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? "删除中..." : "删除"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={batchDeleteOpen} onOpenChange={(open) => { if (!open && !isDeleting) setBatchDeleteOpen(false) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认批量删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除选中的 {selectedIds.size} 个 Session 吗？此操作不可撤销。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setBatchDeleteOpen(false)} disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction disabled={isDeleting} onClick={(e) => { e.preventDefault(); confirmBatchDelete() }} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isDeleting ? "删除中..." : `删除 ${selectedIds.size} 个`}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
