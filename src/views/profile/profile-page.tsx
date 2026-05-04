@@ -24,22 +24,17 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 
+interface StaticFact {
+  content: string
+  tags: string[]
+  visibility: string
+  l2_content?: string
+}
+
 interface ProfileData {
   dynamic_context: string[]
   search_results: string[] | null
-  static_facts: string[]
-}
-
-interface MemoryItem {
-  id: string
-  content: string
-  l2_content: string
-  tags: string[]
-}
-
-interface MemoriesResponse {
-  memories: MemoryItem[]
-  total_count: number
+  static_facts: StaticFact[]
 }
 
 type FactType = "fact" | "preference" | "skill" | "project" | "note" | "private"
@@ -109,9 +104,10 @@ function formatFact(fact: string): string {
   return fact.replace(/^#+\s*/, "").trim()
 }
 
-function isPrivateByTags(tags: string[]): boolean {
-  return tags.some((t) => t === "私密" || t.toLowerCase() === "private")
-}
+  function isPrivateByTags(tags: string[], visibility?: string): boolean {
+    if (visibility === "private") return true
+    return tags.some((t) => t === "私密" || t.toLowerCase() === "private")
+  }
 
 function ExpandableMarkdown({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -174,9 +170,6 @@ const CATEGORIES = [
 export function ProfilePage() {
   const navigate = useNavigate()
   const [profile, setProfile] = useState<ProfileData | null>(null)
-  const [contentMemoryMap, setContentMemoryMap] = useState<Map<string, MemoryItem>>(
-    new Map()
-  )
   const [loading, setLoading] = useState(true)
   const vaultUnlock = useVaultStore((s) => s.unlock)
   const vaultHasPassword = useVaultStore((s) => s.hasPassword)
@@ -190,18 +183,8 @@ export function ProfilePage() {
     async function fetchProfileData() {
       try {
         setLoading(true)
-        const [profileData, memoriesData] = await Promise.all([
-          apiClient.get<ProfileData>("/v1/profile"),
-          apiClient.get<MemoriesResponse>("/v1/memories", {
-            params: { limit: 200, offset: 0 },
-          }),
-        ])
+        const profileData = await apiClient.get<ProfileData>("/v1/profile")
         setProfile(profileData)
-        const map = new Map<string, MemoryItem>()
-        for (const mem of memoriesData.memories || []) {
-          map.set(mem.content, mem)
-        }
-        setContentMemoryMap(map)
       } catch (err) {
         console.error("Failed to fetch profile:", err)
         toast.error("加载用户画像失败")
@@ -246,14 +229,13 @@ export function ProfilePage() {
   const dynamicContext = profile?.dynamic_context || []
 
   const factsWithMeta = useMemo(() => {
-    return staticFacts.map((fact) => {
-      const memory = contentMemoryMap.get(fact)
-      const tags = memory?.tags || []
-      const isPrivate = isPrivateByTags(tags)
-      const meta = isPrivate ? getPrivateMeta() : classifyFact(fact)
-      return { fact, memory, isPrivate, meta }
+    return staticFacts.map((factObj) => {
+      const tags = factObj.tags || []
+      const isPrivate = isPrivateByTags(tags, factObj.visibility)
+      const meta = isPrivate ? getPrivateMeta() : classifyFact(factObj.content)
+      return { fact: factObj.content, factObj, isPrivate, meta }
     })
-  }, [staticFacts, contentMemoryMap])
+  }, [staticFacts])
 
   const stats = useMemo(() => {
     const s = { fact: 0, preference: 0, skill: 0, project: 0, private: 0 }
@@ -416,11 +398,11 @@ export function ProfilePage() {
         <>
           {filteredFacts.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredFacts.map(({ fact, memory, isPrivate, meta }) => {
+              {filteredFacts.map(({ fact, factObj, isPrivate, meta }) => {
                 const Icon = meta.icon
                 const displayContent =
                   isPrivate && unlockedFacts.has(fact)
-                    ? memory?.l2_content || formatFact(fact)
+                    ? factObj?.l2_content || formatFact(fact)
                     : formatFact(fact)
 
                 return (
