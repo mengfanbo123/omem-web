@@ -508,7 +508,7 @@ function EventCard({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                 <span className="font-medium text-foreground">统计：</span>
                 <span className="text-emerald-600 dark:text-emerald-400">
                   保留 {event.kept_count} 条
@@ -516,6 +516,11 @@ function EventCard({
                 <span className="text-red-600 dark:text-red-400">
                   精炼掉 {event.discarded_count} 条
                 </span>
+                {event.profile_injected && (
+                  <span className="text-indigo-600 dark:text-indigo-400">
+                    👤 画像已注入
+                  </span>
+                )}
               </div>
             </div>
           )}
