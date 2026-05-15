@@ -2,7 +2,16 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { useParams, useNavigate } from "react-router-dom"
+
+function formatMarkdownContent(text: string): string {
+  if (!text || text.includes("\n")) return text
+  return text
+    .replace(/(#{1,3}\s+[^#])/g, "\n$1")
+    .replace(/(\d+\.\s+[^\d])/g, "\n$1")
+    .replace(/(\s-\s)/g, "\n- ")
+    .trim()
+}
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -10,7 +19,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import apiClient from "@/api/client"
 import { useVaultStore } from "@/stores/vault"
-import { getTagClassName } from "@/lib/tag-utils"
+import { getCategoryBadgeClass } from "@/lib/tag-utils"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,14 +47,29 @@ import {
   ChevronRight,
 } from "lucide-react"
 
-interface SessionRecall {
+interface RecallEvent {
   id: string
   session_id: string
-  memory_id: string
   recall_type: "auto" | "manual"
   query_text: string
-  similarity_score: number
+  max_score: number
   llm_confidence: number
+  profile_injected: boolean
+  kept_count: number
+  discarded_count: number
+  tenant_id: string
+  created_at: string
+}
+
+interface RecallItem {
+  id: string
+  event_id: string
+  memory_id: string
+  score: number
+  refine_relevance: "high" | "medium" | "irrelevant"
+  refine_reasoning: string
+  is_kept: boolean
+  tenant_id: string
   created_at: string
 }
 
@@ -77,6 +101,12 @@ function shortSessionId(sessionId: string) {
   return sessionId.slice(0, 8) + "..." + sessionId.slice(-8)
 }
 
+function truncateQuery(text: string, max = 80) {
+  if (!text) return "—"
+  if (text.length <= max) return text
+  return text.slice(0, max) + "..."
+}
+
 function RecallTypeBadge({ type }: { type: "auto" | "manual" }) {
   if (type === "auto") {
     return (
@@ -95,8 +125,7 @@ function RecallTypeBadge({ type }: { type: "auto" | "manual" }) {
 }
 
 function CategoryBadge({ category }: { category?: string }) {
-  const tagClass = getTagClassName(category || "未分类", "text-xs font-normal")
-  return <Badge variant="outline" className={tagClass}>{category || "未分类"}</Badge>
+  return <Badge variant="outline" className={`text-xs font-normal ${getCategoryBadgeClass(category)}`}>{category || "未分类"}</Badge>
 }
 
 function ScoreBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
@@ -118,30 +147,55 @@ function ScoreBar({ label, value, max = 1 }: { label: string; value: number; max
   )
 }
 
-function TimelineItem({
-  recall,
+function RefineBadge({ relevance, isKept }: { relevance: string; isKept: boolean }) {
+  if (!isKept) {
+    return (
+      <Badge variant="outline" className="text-xs bg-red-500/10 text-red-600 border-red-500/30">
+        🔴 被精炼掉
+      </Badge>
+    )
+  }
+  if (relevance === "high") {
+    return (
+      <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-600 border-emerald-500/30">
+        🟢 高相关
+      </Badge>
+    )
+  }
+  if (relevance === "medium") {
+    return (
+      <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-600 border-yellow-500/30">
+        🟡 中相关
+      </Badge>
+    )
+  }
+  return (
+    <Badge variant="outline" className="text-xs bg-muted text-muted-foreground border-border">
+      {relevance || "—"}
+    </Badge>
+  )
+}
+
+function ItemCard({
+  item,
   memory,
-  isLast,
-  defaultExpanded,
-  onDelete,
+  memoryLoading,
   vaultUnlocked,
   memoryUnlocked,
   onUnlock,
   onLock,
   onVaultUnlock,
 }: {
-  recall: SessionRecall
+  item: RecallItem
   memory: MemoryDetail | null
-  isLast: boolean
-  defaultExpanded?: boolean
-  onDelete?: (id: string) => void
+  memoryLoading: boolean
   vaultUnlocked?: boolean
   memoryUnlocked?: boolean
   onUnlock?: (memoryId: string) => void
   onLock?: (memoryId: string) => void
   onVaultUnlock?: () => void
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded || false)
+  const [activeTab, setActiveTab] = useState<"refine" | "raw">("refine")
   const [showPwInput, setShowPwInput] = useState(false)
   const [pw, setPw] = useState("")
   const [pwErr, setPwErr] = useState<string | null>(null)
@@ -184,6 +238,210 @@ function TimelineItem({
     }
   }
 
+  const borderClass = item.is_kept
+    ? "border-border"
+    : "border-dashed border-red-500/30 opacity-75"
+
+  return (
+    <div className={`rounded-md border bg-muted/50 p-3 space-y-3 ${borderClass}`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <RefineBadge relevance={item.refine_relevance} isKept={item.is_kept} />
+          <CategoryBadge category={memory?.category} />
+          {isPrivate && (
+            <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
+              <Lock className="size-3 mr-1" />
+              私密
+            </Badge>
+          )}
+          <span className="text-xs text-muted-foreground font-mono">
+            {item.memory_id?.slice(0, 8)}...
+          </span>
+        </div>
+        {isPrivate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleToggle()
+            }}
+            className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1 shrink-0"
+          >
+            {isLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
+            {isLocked ? "解锁" : "锁定"}
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-1 border-b border-border pb-1">
+        <button
+          type="button"
+          onClick={() => setActiveTab("refine")}
+          className={`text-xs px-2 py-1 rounded transition-colors ${
+            activeTab === "refine"
+              ? "bg-primary/10 text-primary font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          精炼
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("raw")}
+          className={`text-xs px-2 py-1 rounded transition-colors ${
+            activeTab === "raw"
+              ? "bg-primary/10 text-primary font-medium"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          原始
+        </button>
+      </div>
+
+      {activeTab === "refine" ? (
+        <div className="space-y-2">
+          <div className="text-sm text-foreground">
+            <span className="font-medium">推理说明：</span>
+            <span className="text-muted-foreground">{item.refine_reasoning || "—"}</span>
+          </div>
+          <ScoreBar label="相似度得分" value={item.score} max={1} />
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {memoryLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ) : memory ? (
+            <>
+              {isLocked ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Lock className="size-4" />
+                    <span>私密记忆内容已隐藏</span>
+                  </div>
+                  {showPwInput && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="password"
+                          placeholder="输入 Vault 密码..."
+                          value={pw}
+                          onChange={(e) => {
+                            setPw(e.target.value)
+                            setPwErr(null)
+                          }}
+                          onKeyDown={(e) => e.key === "Enter" && handlePwSubmit()}
+                          className={pwErr ? "border-destructive flex-1" : "flex-1"}
+                        />
+                        <Button size="sm" onClick={handlePwSubmit}>
+                          解锁
+                        </Button>
+                      </div>
+                      {pwErr && <p className="text-xs text-destructive">{pwErr}</p>}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {formatMarkdownContent(memory.content || memory.l0_abstract || "—")}
+                  </ReactMarkdown>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">记忆内容加载失败</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EventCard({
+  event,
+  isLast,
+  defaultExpanded,
+  vaultUnlocked,
+  unlockedMemories,
+  manuallyLocked,
+  onUnlock,
+  onLock,
+  onVaultUnlock,
+}: {
+  event: RecallEvent
+  isLast: boolean
+  defaultExpanded?: boolean
+  vaultUnlocked?: boolean
+  unlockedMemories: Set<string>
+  manuallyLocked: Set<string>
+  onUnlock?: (memoryId: string) => void
+  onLock?: (memoryId: string) => void
+  onVaultUnlock?: () => void
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded || false)
+  const [items, setItems] = useState<RecallItem[] | null>(null)
+  const [itemsLoading, setItemsLoading] = useState(false)
+  const [itemsError, setItemsError] = useState<string | null>(null)
+  const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
+  const [memoriesLoading, setMemoriesLoading] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!expanded || items !== null) return
+
+    async function fetchItems() {
+      try {
+        setItemsLoading(true)
+        setItemsError(null)
+        const data = await apiClient.get<RecallItem[]>(`/v1/recall-events/${event.id}/items`)
+        setItems(data || [])
+      } catch (err) {
+        console.error("Failed to fetch recall items:", err)
+        setItemsError("加载召回项失败")
+      } finally {
+        setItemsLoading(false)
+      }
+    }
+
+    fetchItems()
+  }, [expanded, event.id, items])
+
+  const loadMemory = async (memoryId: string) => {
+    if (memories.has(memoryId) || memoriesLoading.has(memoryId)) return
+    try {
+      setMemoriesLoading((prev) => new Set(prev).add(memoryId))
+      const data = await apiClient.get<MemoryDetail>(`/v1/memories/${memoryId}`)
+      setMemories((prev) => {
+        const next = new Map(prev)
+        next.set(memoryId, data)
+        return next
+      })
+    } catch (err) {
+      console.error("Failed to fetch memory:", err)
+    } finally {
+      setMemoriesLoading((prev) => {
+        const next = new Set(prev)
+        next.delete(memoryId)
+        return next
+      })
+    }
+  }
+
+  useEffect(() => {
+    if (!items || items.length === 0) return
+    items.forEach((item) => {
+      if (!memories.has(item.memory_id)) {
+        loadMemory(item.memory_id)
+      }
+    })
+  }, [items])
+
+  const memoryUnlockedFor = (memoryId: string) => {
+    return (vaultUnlocked && !manuallyLocked.has(memoryId)) || unlockedMemories.has(memoryId)
+  }
+
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
@@ -200,16 +458,10 @@ function TimelineItem({
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
-                <RecallTypeBadge type={recall.recall_type} />
-                {isPrivate && (
-                  <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-700 hover:bg-amber-100 border-amber-200">
-                    <Lock className="size-3 mr-1" />
-                    私密
-                  </Badge>
-                )}
+                <RecallTypeBadge type={event.recall_type} />
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="size-3" />
-                  {formatDate(recall.created_at)}
+                  {formatDate(event.created_at)}
                 </span>
               </div>
               {expanded ? (
@@ -221,95 +473,47 @@ function TimelineItem({
 
             <div className="mt-2 text-sm text-muted-foreground flex items-center gap-1.5">
               <Search className="size-3.5" />
-              <span className="line-clamp-1">{recall.query_text || "—"}</span>
+              <span className="line-clamp-1" title={event.query_text || "—"}>
+                {truncateQuery(event.query_text)}
+              </span>
             </div>
           </button>
 
           {expanded && (
             <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
               <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <BrainCircuit className="size-3" />
-                      关联记忆
-                    </h4>
-                    {onDelete && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onDelete(recall.id)
-                        }}
-                        className="text-xs text-destructive hover:underline flex items-center gap-1"
-                      >
-                        <Trash2 className="size-3" />
-                        删除
-                      </button>
-                    )}
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <BrainCircuit className="size-3" />
+                    关联记忆
+                  </h4>
+                </div>
+
+                {itemsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-24 w-full" />
+                    <Skeleton className="h-24 w-full" />
                   </div>
-                {memory ? (
-                  <div className="rounded-md bg-muted p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      {isLocked ? (
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Lock className="size-4" />
-                            <span>私密记忆内容已隐藏</span>
-                          </div>
-                          {showPwInput && (
-                            <div className="space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  type="password"
-                                  placeholder="输入 Vault 密码..."
-                                  value={pw}
-                                  onChange={(e) => {
-                                    setPw(e.target.value)
-                                    setPwErr(null)
-                                  }}
-                                  onKeyDown={(e) => e.key === "Enter" && handlePwSubmit()}
-                                  className={pwErr ? "border-destructive flex-1" : "flex-1"}
-                                />
-                                <Button size="sm" onClick={handlePwSubmit}>
-                                  解锁
-                                </Button>
-                              </div>
-                              {pwErr && (
-                                <p className="text-xs text-destructive">{pwErr}</p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {memory.content || memory.l0_abstract || "—"}
-                          </ReactMarkdown>
-                        </div>
-                      )}
-                      {isPrivate && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleToggle()
-                          }}
-                          className="text-xs text-amber-500 hover:text-amber-600 flex items-center gap-1 shrink-0"
-                        >
-                          {isLocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-                          {isLocked ? "解锁" : "锁定"}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CategoryBadge category={memory.category} />
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {memory.id?.slice(0, 8)}...
-                      </span>
-                    </div>
+                ) : itemsError ? (
+                  <p className="text-sm text-destructive">{itemsError}</p>
+                ) : items && items.length > 0 ? (
+                  <div className="space-y-3">
+                    {items.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        memory={memories.get(item.memory_id) || null}
+                        memoryLoading={memoriesLoading.has(item.memory_id)}
+                        vaultUnlocked={vaultUnlocked}
+                        memoryUnlocked={memoryUnlockedFor(item.memory_id)}
+                        onUnlock={onUnlock}
+                        onLock={onLock}
+                        onVaultUnlock={onVaultUnlock}
+                      />
+                    ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-muted-foreground">记忆内容加载中...</p>
+                  <p className="text-sm text-muted-foreground">暂无召回项</p>
                 )}
               </div>
 
@@ -319,13 +523,19 @@ function TimelineItem({
                   匹配指标
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <ScoreBar label="Query 关联度" value={recall.similarity_score} />
-                  <ScoreBar label="记忆匹配度" value={recall.llm_confidence} />
+                  <ScoreBar label="最大相似度" value={event.max_score} />
+                  <ScoreBar label="LLM 置信度" value={event.llm_confidence} />
                 </div>
               </div>
 
-              <div className="text-xs text-muted-foreground font-mono">
-                Memory ID: {recall.memory_id}
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">统计：</span>
+                <span className="text-emerald-600 dark:text-emerald-400">
+                  保留 {event.kept_count} 条
+                </span>
+                <span className="text-red-600 dark:text-red-400">
+                  精炼掉 {event.discarded_count} 条
+                </span>
               </div>
             </div>
           )}
@@ -338,14 +548,24 @@ function TimelineItem({
 export function SessionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const handleGoBack = () => {
+    const fromState = location.state as { from?: string } | null
+    if (fromState?.from) {
+      navigate(fromState.from, { replace: true })
+    } else {
+      navigate(-1)
+    }
+  }
+
   const sessionId = id ? decodeURIComponent(id) : ""
 
-  const [recalls, setRecalls] = useState<SessionRecall[]>([])
-  const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
+  const [events, setEvents] = useState<RecallEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [showVaultInput, setShowVaultInput] = useState(false)
   const [vaultPassword, setVaultPassword] = useState("")
   const [vaultError, setVaultError] = useState<string | null>(null)
@@ -358,8 +578,8 @@ export function SessionDetailPage() {
   const [pendingUnlockMemoryId, setPendingUnlockMemoryId] = useState<string | null>(null)
 
   const PAGE_SIZE = 10
-  const totalPages = Math.ceil(recalls.length / PAGE_SIZE)
-  const paginatedRecalls = recalls.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+  const totalPages = Math.ceil(events.length / PAGE_SIZE)
+  const paginatedEvents = events.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   useEffect(() => {
     if (!sessionId) return
@@ -370,25 +590,16 @@ export function SessionDetailPage() {
         setError(null)
 
         const data = await apiClient.get<{
-          recalls: SessionRecall[]
+          events: RecallEvent[]
           limit: number
           offset: number
-          memories?: MemoryDetail[]
-        }>("/v1/session-recalls", {
-          params: { session_id: sessionId, expand: "memories", limit: 10000 },
+        }>("/v1/recall-events", {
+          params: { session_id: sessionId, limit: 10000, offset: 0 },
         })
-        const list = (data?.recalls || []).sort(
+        const list = (data?.events || []).sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
-        setRecalls(list)
-
-        const map = new Map<string, MemoryDetail>()
-        if (data?.memories) {
-          for (const mem of data.memories) {
-            map.set(mem.id, mem)
-          }
-        }
-        setMemories(map)
+        setEvents(list)
       } catch (err) {
         console.error("Failed to fetch session detail:", err)
         setError("加载 Session 详情失败")
@@ -401,21 +612,20 @@ export function SessionDetailPage() {
     fetchData()
   }, [sessionId])
 
-  const handleDeleteRecall = (recallId: string) => {
-    setDeleteTarget(recallId)
+  const handleDeleteSession = () => {
+    setDeleteDialogOpen(true)
   }
 
-  const confirmDelete = async () => {
-    if (!deleteTarget) return
+  const confirmDeleteSession = async () => {
     try {
-      await apiClient.delete(`/v1/session-recalls/${deleteTarget}`)
-      setRecalls((prev) => prev.filter((r) => r.id !== deleteTarget))
-      toast.success("删除成功")
+      await apiClient.delete(`/v1/session-recalls/session/${sessionId}`)
+      toast.success("Session 记录已删除")
+      navigate(-1)
     } catch (err) {
-      console.error("Failed to delete recall:", err)
+      console.error("Failed to delete session records:", err)
       toast.error("删除失败")
     } finally {
-      setDeleteTarget(null)
+      setDeleteDialogOpen(false)
     }
   }
 
@@ -447,7 +657,9 @@ export function SessionDetailPage() {
   }
 
   const handleToggleMemoryLock = (memoryId: string) => {
-    const isCurrentlyUnlocked = unlockedMemories.has(memoryId) || (sessionVaultUnlocked && !manuallyLocked.has(memoryId))
+    const isCurrentlyUnlocked =
+      unlockedMemories.has(memoryId) ||
+      (sessionVaultUnlocked && !manuallyLocked.has(memoryId))
 
     if (isCurrentlyUnlocked) {
       setManuallyLocked((prev) => new Set(prev).add(memoryId))
@@ -469,9 +681,11 @@ export function SessionDetailPage() {
   }
 
   const stats = {
-    total: recalls.length,
-    auto: recalls.filter((r) => r.recall_type === "auto").length,
-    manual: recalls.filter((r) => r.recall_type === "manual").length,
+    total: events.length,
+    auto: events.filter((e) => e.recall_type === "auto").length,
+    manual: events.filter((e) => e.recall_type === "manual").length,
+    totalKept: events.reduce((sum, e) => sum + e.kept_count, 0),
+    totalDiscarded: events.reduce((sum, e) => sum + e.discarded_count, 0),
   }
 
   if (loading) {
@@ -499,7 +713,7 @@ export function SessionDetailPage() {
   if (error) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="sm" onClick={() => handleGoBack()}>
           <ArrowLeft className="size-4 mr-1.5" />
           返回
         </Button>
@@ -514,7 +728,7 @@ export function SessionDetailPage() {
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="sm" onClick={() => handleGoBack()}>
             <ArrowLeft className="size-4 mr-1.5" />
             返回
           </Button>
@@ -536,7 +750,7 @@ export function SessionDetailPage() {
         <Card>
           <CardContent className="pt-4 text-center">
             <div className="text-2xl font-semibold">{stats.total}</div>
-            <div className="text-xs text-muted-foreground">总注入数</div>
+            <div className="text-xs text-muted-foreground">总召回事件</div>
           </CardContent>
         </Card>
         <Card>
@@ -553,12 +767,23 @@ export function SessionDetailPage() {
         </Card>
       </div>
 
+      {(stats.totalKept > 0 || stats.totalDiscarded > 0) && (
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+            共保留 {stats.totalKept} 条记忆
+          </span>
+          <span className="text-red-600 dark:text-red-400 font-medium">
+            共精炼掉 {stats.totalDiscarded} 条记忆
+          </span>
+        </div>
+      )}
+
       <div className="space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-sm font-medium text-muted-foreground">注入时间线</h2>
+          <h2 className="text-sm font-medium text-muted-foreground">召回事件时间线</h2>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">
-              共 {recalls.length} 条记录
+              共 {events.length} 个事件
             </span>
             {totalPages > 1 && (
               <div className="flex items-center gap-1">
@@ -627,22 +852,21 @@ export function SessionDetailPage() {
           </div>
         )}
 
-        {recalls.length === 0 ? (
+        {events.length === 0 ? (
           <div className="rounded-lg border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-            暂无注入记录
+            暂无召回事件
           </div>
         ) : (
           <>
-            {paginatedRecalls.map((recall, index) => (
-              <TimelineItem
-                key={recall.id}
-                recall={recall}
-                memory={memories.get(recall.memory_id) || null}
-                isLast={index === paginatedRecalls.length - 1 && currentPage === totalPages}
+            {paginatedEvents.map((event, index) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                isLast={index === paginatedEvents.length - 1 && currentPage === totalPages}
                 defaultExpanded={index === 0 && currentPage === 1}
-                onDelete={handleDeleteRecall}
                 vaultUnlocked={sessionVaultUnlocked}
-                memoryUnlocked={(sessionVaultUnlocked && !manuallyLocked.has(recall.memory_id)) || unlockedMemories.has(recall.memory_id)}
+                unlockedMemories={unlockedMemories}
+                manuallyLocked={manuallyLocked}
                 onUnlock={handleToggleMemoryLock}
                 onLock={handleToggleMemoryLock}
                 onVaultUnlock={() => setSessionVaultUnlocked(true)}
@@ -652,7 +876,7 @@ export function SessionDetailPage() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between gap-2 pt-4">
                 <span className="text-xs text-muted-foreground">
-                  共 {recalls.length} 条记录
+                  共 {events.length} 个事件
                 </span>
                 <div className="flex items-center gap-2">
                   <Button
@@ -681,17 +905,34 @@ export function SessionDetailPage() {
         )}
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      {events.length > 0 && (
+        <div className="pt-4 border-t border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleDeleteSession}
+          >
+            <Trash2 className="size-3.5 mr-1" />
+            删除 Session 所有记录
+          </Button>
+        </div>
+      )}
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={(open) => !open && setDeleteDialogOpen(false)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>确认删除注入记录</AlertDialogTitle>
+            <AlertDialogTitle>确认删除 Session 记录</AlertDialogTitle>
             <AlertDialogDescription>
-              此操作不可撤销。确定要删除这条注入记录吗？
+              此操作将删除该 Session 的所有召回记录，不可撤销。确定要继续吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteSession}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               删除
             </AlertDialogAction>
           </AlertDialogFooter>
