@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -131,11 +131,12 @@ function CategoryBadge({ category }: { category?: string }) {
 function ScoreBar({ label, value, max = 1 }: { label: string; value: number; max?: number }) {
   const safeValue = Math.max(0, Math.min(value, max))
   const percentage = (safeValue / max) * 100
+  const isZero = value === 0
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{percentage.toFixed(1)}%</span>
+        <span className="font-medium">{isZero ? "—" : `${percentage.toFixed(1)}%`}</span>
       </div>
       <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
         <div
@@ -362,6 +363,7 @@ function ItemCard({
 
 function EventCard({
   event,
+  initialItems,
   isLast,
   defaultExpanded,
   vaultUnlocked,
@@ -372,6 +374,7 @@ function EventCard({
   onVaultUnlock,
 }: {
   event: RecallEvent
+  initialItems?: RecallItem[]
   isLast: boolean
   defaultExpanded?: boolean
   vaultUnlocked?: boolean
@@ -382,33 +385,17 @@ function EventCard({
   onVaultUnlock?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
-  const [items, setItems] = useState<RecallItem[] | null>(null)
-  const [itemsLoading, setItemsLoading] = useState(false)
-  const [itemsError, setItemsError] = useState<string | null>(null)
+  const [items, setItems] = useState<RecallItem[] | null>(initialItems ?? null)
   const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
   const [memoriesLoading, setMemoriesLoading] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    if (!expanded || items !== null) return
-
-    async function fetchItems() {
-      try {
-        setItemsLoading(true)
-        setItemsError(null)
-        const data = await apiClient.get<RecallItem[]>(`/v1/recall-events/${event.id}/items`)
-        setItems(data || [])
-      } catch (err) {
-        console.error("Failed to fetch recall items:", err)
-        setItemsError("加载召回项失败")
-      } finally {
-        setItemsLoading(false)
-      }
+    if (initialItems && items === null) {
+      setItems(initialItems)
     }
+  }, [initialItems, items])
 
-    fetchItems()
-  }, [expanded, event.id, items])
-
-  const loadMemory = async (memoryId: string) => {
+  const loadMemory = useCallback(async (memoryId: string) => {
     if (memories.has(memoryId) || memoriesLoading.has(memoryId)) return
     try {
       setMemoriesLoading((prev) => new Set(prev).add(memoryId))
@@ -427,16 +414,16 @@ function EventCard({
         return next
       })
     }
-  }
+  }, [memories, memoriesLoading])
 
   useEffect(() => {
-    if (!items || items.length === 0) return
+    if (!expanded || !items || items.length === 0) return
     items.forEach((item) => {
-      if (!memories.has(item.memory_id)) {
+      if (!memories.has(item.memory_id) && !memoriesLoading.has(item.memory_id)) {
         loadMemory(item.memory_id)
       }
     })
-  }, [items])
+  }, [expanded, items, memories, memoriesLoading, loadMemory])
 
   const memoryUnlockedFor = (memoryId: string) => {
     return (vaultUnlocked && !manuallyLocked.has(memoryId)) || unlockedMemories.has(memoryId)
@@ -489,14 +476,7 @@ function EventCard({
                   </h4>
                 </div>
 
-                {itemsLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-24 w-full" />
-                    <Skeleton className="h-24 w-full" />
-                  </div>
-                ) : itemsError ? (
-                  <p className="text-sm text-destructive">{itemsError}</p>
-                ) : items && items.length > 0 ? (
+                {items && items.length > 0 ? (
                   <div className="space-y-3">
                     {items.map((item) => (
                       <ItemCard
@@ -562,6 +542,7 @@ export function SessionDetailPage() {
   const sessionId = id ? decodeURIComponent(id) : ""
 
   const [events, setEvents] = useState<RecallEvent[]>([])
+  const [eventItemsMap, setEventItemsMap] = useState<Map<string, RecallItem[]>>(new Map())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
@@ -591,15 +572,25 @@ export function SessionDetailPage() {
 
         const data = await apiClient.get<{
           events: RecallEvent[]
+          event_items?: {
+            id: string
+            items: RecallItem[]
+          }[]
           limit: number
           offset: number
         }>("/v1/recall-events", {
-          params: { session_id: sessionId, limit: 10000, offset: 0 },
+          params: { session_id: sessionId, limit: 10000, offset: 0, expand: "items" },
         })
         const list = (data?.events || []).sort(
           (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
         setEvents(list)
+
+        if (data?.event_items) {
+          const map = new Map<string, RecallItem[]>()
+          data.event_items.forEach((ei) => map.set(ei.id, ei.items || []))
+          setEventItemsMap(map)
+        }
       } catch (err) {
         console.error("Failed to fetch session detail:", err)
         setError("加载 Session 详情失败")
@@ -862,6 +853,7 @@ export function SessionDetailPage() {
               <EventCard
                 key={event.id}
                 event={event}
+                initialItems={eventItemsMap.get(event.id)}
                 isLast={index === paginatedEvents.length - 1 && currentPage === totalPages}
                 defaultExpanded={index === 0 && currentPage === 1}
                 vaultUnlocked={sessionVaultUnlocked}
