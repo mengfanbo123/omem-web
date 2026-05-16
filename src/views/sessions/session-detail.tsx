@@ -45,6 +45,7 @@ import {
   Unlock,
   ChevronLeft,
   ChevronRight,
+  Code,
 } from "lucide-react"
 
 interface RecallEvent {
@@ -57,6 +58,9 @@ interface RecallEvent {
   profile_injected: boolean
   kept_count: number
   discarded_count: number
+  injected_count?: number
+  profile_content?: string
+  injected_content?: string
   tenant_id: string
   created_at: string
 }
@@ -385,6 +389,7 @@ function EventCard({
   onVaultUnlock?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
+  const [showInjected, setShowInjected] = useState(false)
   const [items, setItems] = useState<RecallItem[] | null>(initialItems ?? null)
   const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
   const [memoriesLoading, setMemoriesLoading] = useState<Set<string>>(new Set())
@@ -468,6 +473,47 @@ function EventCard({
 
           {expanded && (
             <div className="px-4 pb-4 space-y-4 border-t border-border pt-4">
+              {event.profile_content && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <BrainCircuit className="size-3" />
+                    画像注入内容
+                  </h4>
+                  <div className="rounded-md border border-indigo-500/20 bg-indigo-500/5 p-3">
+                    <div className="prose prose-sm dark:prose-invert max-w-none text-sm text-indigo-700 dark:text-indigo-300">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {event.profile_content.replace(/<\/?cerebro-profile>/g, "").trim()}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {event.injected_content && (
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowInjected(!showInjected)}
+                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  >
+                    <Code className="size-3" />
+                    注入内容
+                    {showInjected ? (
+                      <ChevronUp className="size-3" />
+                    ) : (
+                      <ChevronDown className="size-3" />
+                    )}
+                  </button>
+                  {showInjected && (
+                    <div className="rounded-md border border-border bg-muted/30 p-3">
+                      <pre className="font-mono text-xs whitespace-pre-wrap break-all max-h-96 overflow-y-auto text-foreground">
+                        {event.injected_content}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -516,6 +562,11 @@ function EventCard({
                 <span className="text-red-600 dark:text-red-400">
                   精炼掉 {event.discarded_count} 条
                 </span>
+                {event.injected_count != null && event.injected_count > 0 && (
+                  <span className="text-blue-600 dark:text-blue-400">
+                    实际注入 {event.injected_count} 条
+                  </span>
+                )}
                 {event.profile_injected && (
                   <span className="text-indigo-600 dark:text-indigo-400">
                     👤 画像已注入
