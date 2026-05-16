@@ -389,7 +389,7 @@ function EventCard({
   onVaultUnlock?: () => void
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded || false)
-  const [showInjected, setShowInjected] = useState(false)
+  const [showInjected, setShowInjected] = useState(true)
   const [items, setItems] = useState<RecallItem[] | null>(initialItems ?? null)
   const [memories, setMemories] = useState<Map<string, MemoryDetail>>(new Map())
   const [memoriesLoading, setMemoriesLoading] = useState<Set<string>>(new Set())
@@ -505,10 +505,12 @@ function EventCard({
                     )}
                   </button>
                   {showInjected && (
-                    <div className="rounded-md border border-border bg-muted/30 p-3">
-                      <pre className="font-mono text-xs whitespace-pre-wrap break-all max-h-96 overflow-y-auto text-foreground">
-                        {event.injected_content}
-                      </pre>
+                    <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-3 max-h-96 overflow-y-auto">
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm text-emerald-700 dark:text-emerald-300">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {event.injected_content!.replace(/<\/?cerebro-context>/g, "").trim()}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   )}
                 </div>
